@@ -39,11 +39,14 @@
             border: none;
             cursor: pointer;
         }
-        #result {
+        #result, #debug {
             margin-top: 20px;
             width: 100%;
             max-width: 300px;
             word-wrap: break-word;
+        }
+        #debug {
+            color: red;
         }
     </style>
 </head>
@@ -54,42 +57,58 @@
     <button id="capture-btn">Tara</button>
     <canvas id="canvas" style="display:none;"></canvas>
     <div id="result"></div>
+    <div id="debug"></div>
 
     <script>
         const video = document.getElementById('video');
         const canvas = document.getElementById('canvas');
         const captureBtn = document.getElementById('capture-btn');
         const result = document.getElementById('result');
+        const debug = document.getElementById('debug');
 
         // Kamera erişimi
         async function setupCamera() {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-            video.srcObject = stream;
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+                video.srcObject = stream;
+                debug.textContent = 'Kamera başarıyla başlatıldı.';
+            } catch (error) {
+                debug.textContent = 'Kamera erişim hatası: ' + error.message;
+            }
         }
 
         setupCamera();
 
         // OCR işlemi
         async function performOCR(imageData) {
-            const worker = await Tesseract.createWorker('eng');
-            const { data: { text } } = await worker.recognize(imageData);
-            await worker.terminate();
-            return text;
+            try {
+                const worker = await Tesseract.createWorker('eng');
+                debug.textContent = 'OCR işlemi başlatıldı.';
+                const { data: { text } } = await worker.recognize(imageData);
+                await worker.terminate();
+                debug.textContent = 'OCR işlemi tamamlandı.';
+                return text;
+            } catch (error) {
+                throw new Error('OCR işlemi sırasında hata: ' + error.message);
+            }
         }
 
         captureBtn.addEventListener('click', async () => {
-            canvas.width = 100;
-            canvas.height = 70;
-            canvas.getContext('2d').drawImage(video, 0, 0, 100, 70);
-            
-            const imageData = canvas.toDataURL('image/png');
-            result.textContent = 'İşleniyor...';
-            
             try {
+                canvas.width = 100;
+                canvas.height = 70;
+                canvas.getContext('2d').drawImage(video, 0, 0, 100, 70);
+                
+                const imageData = canvas.toDataURL('image/png');
+                result.textContent = 'İşleniyor...';
+                debug.textContent = 'Görüntü yakalandı, OCR başlatılıyor.';
+                
                 const text = await performOCR(imageData);
                 result.textContent = 'Taranan Metin: ' + text;
+                debug.textContent = 'İşlem başarıyla tamamlandı.';
             } catch (error) {
-                result.textContent = 'Hata oluştu: ' + error.message;
+                result.textContent = 'Hata oluştu';
+                debug.textContent = error.message;
             }
         });
     </script>
