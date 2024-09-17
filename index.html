@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mobil Kamera OCR</title>
+    <title>Fast Mobile Camera OCR</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -62,12 +62,12 @@
     </style>
 </head>
 <body>
-    <h1>Mobil Kamera OCR</h1>
+    <h1>Fast Mobile Camera OCR</h1>
     <div id="videoContainer">
         <video id="video" autoplay playsinline></video>
         <div id="scanArea"></div>
     </div>
-    <button id="scanButton">OCR Tara</button>
+    <button id="scanButton">Scan OCR</button>
     <canvas id="canvas" style="display: none;"></canvas>
     <div id="result"></div>
     <script src='https://unpkg.com/tesseract.js@v2.1.0/dist/tesseract.min.js'></script>
@@ -77,22 +77,38 @@
         const scanButton = document.getElementById('scanButton');
         const result = document.getElementById('result');
 
-        // Kamera erişimi
+        // Initialize Tesseract worker
+        const worker = Tesseract.createWorker({
+            logger: m => console.log(m)
+        });
+
+        // Camera access
         async function startCamera() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
                 video.srcObject = stream;
             } catch (err) {
-                console.error("Kamera erişimi hatası:", err);
-                alert("Kamera erişimi sağlanamadı. Lütfen kamera izinlerini kontrol edin.");
+                console.error("Camera access error:", err);
+                alert("Failed to access camera. Please check camera permissions.");
             }
         }
 
-        // OCR tarama
-        scanButton.onclick = function() {
-            result.textContent = "Taranıyor...";
+        // Initialize Tesseract
+        async function initTesseract() {
+            await worker.load();
+            await worker.loadLanguage('eng');
+            await worker.initialize('eng');
+            await worker.setParameters({
+                tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789',
+                tessedit_pageseg_mode: Tesseract.PSM.SINGLE_LINE,
+            });
+        }
+
+        // OCR scanning
+        scanButton.onclick = async function() {
+            result.textContent = "Scanning...";
             
-            // Kamera görüntüsünün ortasındaki alanı yakalama
+            // Capture the center area of the camera image
             canvas.width = 200;
             canvas.height = 150;
             const videoWidth = video.videoWidth;
@@ -102,19 +118,18 @@
             
             canvas.getContext('2d').drawImage(video, startX, startY, 200, 150, 0, 0, 200, 150);
 
-            // OCR işlemi
-            Tesseract.recognize(canvas, 'tur')
-                .then(({ data: { text } }) => {
-                    result.textContent = text;
-                })
-                .catch(err => {
-                    console.error("OCR hatası:", err);
-                    result.textContent = "OCR taraması başarısız oldu.";
-                });
+            try {
+                const { data: { text } } = await worker.recognize(canvas);
+                result.textContent = text.trim();
+            } catch (err) {
+                console.error("OCR error:", err);
+                result.textContent = "OCR scanning failed.";
+            }
         };
 
-        // Kamerayı başlat
+        // Start camera and initialize Tesseract
         startCamera();
+        initTesseract();
     </script>
 </body>
 </html>
