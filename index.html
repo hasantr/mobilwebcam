@@ -27,8 +27,9 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            min-width: 100%;
-            min-height: 100%;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
         }
         #capture-btn {
             margin-top: 20px;
@@ -75,9 +76,17 @@
         // Kamera erişimi
         async function setupCamera() {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: 'environment',
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    }
+                });
                 video.srcObject = stream;
-                debug.textContent = 'Kamera başarıyla başlatıldı.';
+                video.onloadedmetadata = () => {
+                    debug.textContent = `Kamera başlatıldı. Çözünürlük: ${video.videoWidth}x${video.videoHeight}`;
+                };
             } catch (error) {
                 debug.textContent = 'Kamera erişim hatası: ' + error.message;
             }
@@ -88,24 +97,39 @@
         // OCR işlemi
         async function performOCR(imageData) {
             try {
-                const worker = await Tesseract.createWorker('eng');
+                const worker = await Tesseract.createWorker();
+                await worker.loadLanguage('eng');
+                await worker.initialize('eng');
                 debug.textContent = 'OCR işlemi başlatıldı.';
                 const { data: { text } } = await worker.recognize(imageData);
                 await worker.terminate();
                 debug.textContent = 'OCR işlemi tamamlandı.';
                 return text;
             } catch (error) {
-                throw new Error('OCR işlemi sırasında hata: ' + error.message);
+                console.error('OCR Hatası:', error);
+                throw new Error('OCR işlemi sırasında hata: ' + (error.message || 'Bilinmeyen hata'));
             }
         }
 
         captureBtn.addEventListener('click', async () => {
             try {
-                canvas.width = 100;
-                canvas.height = 70;
-                canvas.getContext('2d').drawImage(video, 0, 0, 100, 70);
+                // Kamera görüntüsünün en-boy oranını koruyarak 100x70 boyutuna ölçeklendirme
+                const aspectRatio = video.videoWidth / video.videoHeight;
+                let captureWidth = 100;
+                let captureHeight = captureWidth / aspectRatio;
+                
+                if (captureHeight > 70) {
+                    captureHeight = 70;
+                    captureWidth = captureHeight * aspectRatio;
+                }
+
+                canvas.width = captureWidth;
+                canvas.height = captureHeight;
+                canvas.getContext('2d').drawImage(video, 0, 0, captureWidth, captureHeight);
                 
                 // Önizleme canvas'ına görüntüyü çiz
+                previewCanvas.width = captureWidth;
+                previewCanvas.height = captureHeight;
                 previewCanvas.getContext('2d').drawImage(canvas, 0, 0);
                 
                 const imageData = canvas.toDataURL('image/png');
