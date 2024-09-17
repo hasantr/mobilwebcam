@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Enhanced Camera Access OCR</title>
+    <title>Simplified Camera OCR</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -24,7 +24,7 @@
             overflow: hidden;
             background-color: #000;
         }
-        #video, #processedCanvas {
+        #video {
             width: 100%;
             height: 100%;
             object-fit: cover;
@@ -68,10 +68,9 @@
     </style>
 </head>
 <body>
-    <h1>Enhanced Camera Access OCR</h1>
+    <h1>Simplified Camera OCR</h1>
     <div id="videoContainer">
         <video id="video" autoplay playsinline></video>
-        <canvas id="processedCanvas"></canvas>
         <div id="scanArea"></div>
     </div>
     <button id="scanButton">Scan Digits</button>
@@ -79,32 +78,20 @@
     <div id="result"></div>
     <div id="debugInfo"></div>
     <script src='https://unpkg.com/tesseract.js@v2.1.0/dist/tesseract.min.js'></script>
-    <script src='https://cdnjs.cloudflare.com/ajax/libs/opencv.js/4.5.1/opencv.min.js' onload='onOpenCvReady();'></script>
     <script>
         const video = document.getElementById('video');
         const canvas = document.getElementById('canvas');
-        const processedCanvas = document.getElementById('processedCanvas');
         const scanButton = document.getElementById('scanButton');
         const result = document.getElementById('result');
         const debugInfo = document.getElementById('debugInfo');
 
         let worker;
 
-        function onOpenCvReady() {
-            console.log('OpenCV.js is ready');
-            startCamera();
-            initTesseract();
-        }
-
         // Camera access
         async function startCamera() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { 
-                        facingMode: "environment",
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 }
-                    } 
+                    video: { facingMode: "environment" } 
                 });
                 video.srcObject = stream;
                 video.onloadedmetadata = () => {
@@ -120,13 +107,12 @@
 
         // Initialize Tesseract
         async function initTesseract() {
-            worker = Tesseract.createWorker({
+            worker = await Tesseract.createWorker({
                 logger: m => {
                     console.log(m);
                     debugInfo.textContent += `Tesseract: ${m.status}\n`;
                 }
             });
-            await worker.load();
             await worker.loadLanguage('eng');
             await worker.initialize('eng');
             await worker.setParameters({
@@ -134,14 +120,6 @@
                 tessedit_pageseg_mode: Tesseract.PSM.SINGLE_LINE,
             });
             debugInfo.textContent += "Tesseract initialized\n";
-        }
-
-        // Image preprocessing
-        function preprocessImage(src) {
-            let dst = new cv.Mat();
-            cv.cvtColor(src, src, cv.COLOR_RGBA2GRAY);
-            cv.threshold(src, dst, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU);
-            return dst;
         }
 
         // OCR scanning
@@ -160,14 +138,8 @@
             canvas.getContext('2d').drawImage(video, startX, startY, 200, 150, 0, 0, 200, 150);
             debugInfo.textContent += `Captured area: ${startX},${startY} - 200x150\n`;
 
-            // Preprocess the image
-            let src = cv.imread(canvas);
-            let dst = preprocessImage(src);
-            cv.imshow(processedCanvas, dst);
-            debugInfo.textContent += "Image preprocessed\n";
-
             try {
-                const { data: { text } } = await worker.recognize(processedCanvas);
+                const { data: { text } } = await worker.recognize(canvas);
                 const cleanedText = text.replace(/[^0-9]/g, '');
                 result.textContent = cleanedText;
                 debugInfo.textContent += `OCR result: ${text}\nCleaned result: ${cleanedText}\n`;
@@ -176,10 +148,11 @@
                 result.textContent = "OCR scanning failed.";
                 debugInfo.textContent += `OCR error: ${err.message}\n`;
             }
-
-            src.delete();
-            dst.delete();
         };
+
+        // Start the application
+        startCamera();
+        initTesseract();
     </script>
 </body>
 </html>
