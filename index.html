@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Advanced Color Processing OCR App</title>
+    <title>Fixed Camera OCR App</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -70,7 +70,7 @@
     </style>
 </head>
 <body>
-    <h1>Advanced Color Processing OCR App</h1>
+    <h1>Fixed Camera OCR App</h1>
     <div id="videoContainer">
         <video id="video" autoplay playsinline></video>
         <div id="scanArea"></div>
@@ -96,7 +96,10 @@
         const SCAN_AREA_WIDTH = 480;
         const SCAN_AREA_HEIGHT = 360;
 
+        let isOpenCvReady = false;
+
         function onOpenCvReady() {
+            isOpenCvReady = true;
             debugInfo.textContent += "OpenCV.js is ready.\n";
             startCamera();
         }
@@ -126,23 +129,22 @@
 
         function updateScanArea() {
             const videoAspectRatio = video.videoWidth / video.videoHeight;
-            const containerAspectRatio = video.offsetWidth / video.offsetHeight;
+            const containerWidth = videoContainer.offsetWidth;
+            const containerHeight = videoContainer.offsetHeight;
+            const containerAspectRatio = containerWidth / containerHeight;
 
-            let videoDrawWidth, videoDrawHeight;
+            let scanAreaWidth, scanAreaHeight;
 
             if (videoAspectRatio > containerAspectRatio) {
-                videoDrawHeight = video.offsetHeight;
-                videoDrawWidth = video.offsetHeight * videoAspectRatio;
+                scanAreaHeight = containerHeight * 0.8;
+                scanAreaWidth = scanAreaHeight * (SCAN_AREA_WIDTH / SCAN_AREA_HEIGHT);
             } else {
-                videoDrawWidth = video.offsetWidth;
-                videoDrawHeight = video.offsetWidth / videoAspectRatio;
+                scanAreaWidth = containerWidth * 0.8;
+                scanAreaHeight = scanAreaWidth * (SCAN_AREA_HEIGHT / SCAN_AREA_WIDTH);
             }
 
-            const scaleX = videoDrawWidth / video.videoWidth;
-            const scaleY = videoDrawHeight / video.videoHeight;
-
-            scanArea.style.width = `${SCAN_AREA_WIDTH * scaleX}px`;
-            scanArea.style.height = `${SCAN_AREA_HEIGHT * scaleY}px`;
+            scanArea.style.width = `${scanAreaWidth}px`;
+            scanArea.style.height = `${scanAreaHeight}px`;
         }
 
         function preprocessImage(src) {
@@ -154,6 +156,11 @@
 
         // OCR scanning
         scanButton.onclick = async function() {
+            if (!isOpenCvReady) {
+                alert("OpenCV.js is not ready yet. Please wait a moment and try again.");
+                return;
+            }
+
             result.textContent = "Scanning...";
             debugInfo.textContent = "Scan button clicked\n";
             
@@ -193,9 +200,6 @@
             src.delete();
             dst.delete();
         };
-
-        // Start the camera
-        // startCamera();  // This is now called in onOpenCvReady
 
         // Update scan area on window resize
         window.addEventListener('resize', updateScanArea);
