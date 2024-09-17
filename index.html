@@ -1,131 +1,97 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="tr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mobile Camera OCR with OpenCV</title>
+    <title>Mobil OCR Kamera Uygulaması</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.1.1/tesseract.min.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 20px;
             display: flex;
             flex-direction: column;
             align-items: center;
-            background-color: #f0f0f0;
+            margin: 0;
+            padding: 20px;
+            height: 100vh;
         }
-        h1 {
-            color: #333;
+        #video-container {
+            position: relative;
+            width: 100px;
+            height: 70px;
+            overflow: hidden;
+            border: 2px solid #333;
         }
         #video {
-            max-width: 100%;
-            margin-bottom: 20px;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            min-width: 100%;
+            min-height: 100%;
         }
-        #scanButton {
-            background-color: #4CAF50;
-            border: none;
-            color: white;
-            padding: 15px 32px;
-            text-align: center;
-            text-decoration: none;
-            display: inline-block;
+        #capture-btn {
+            margin-top: 20px;
+            padding: 10px 20px;
             font-size: 16px;
-            margin: 4px 2px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
             cursor: pointer;
-            border-radius: 5px;
         }
         #result {
             margin-top: 20px;
-            padding: 10px;
-            background-color: white;
-            border-radius: 5px;
             width: 100%;
             max-width: 300px;
-        }
-        #processedImage {
-            max-width: 100%;
-            margin-top: 20px;
+            word-wrap: break-word;
         }
     </style>
 </head>
 <body>
-    <h1>Mobile Camera OCR with OpenCV</h1>
-    <video id="video" autoplay playsinline></video>
-    <button id="scanButton">Scan and OCR</button>
-    <canvas id="canvas" style="display: none;"></canvas>
-    <img id="processedImage" style="display: none;">
+    <div id="video-container">
+        <video id="video" autoplay playsinline></video>
+    </div>
+    <button id="capture-btn">Tara</button>
+    <canvas id="canvas" style="display:none;"></canvas>
     <div id="result"></div>
 
-    <script src='https://unpkg.com/tesseract.js@v2.1.0/dist/tesseract.min.js'></script>
-    <script src="https://docs.opencv.org/4.5.2/opencv.js"></script>
     <script>
         const video = document.getElementById('video');
         const canvas = document.getElementById('canvas');
-        const scanButton = document.getElementById('scanButton');
+        const captureBtn = document.getElementById('capture-btn');
         const result = document.getElementById('result');
-        const processedImage = document.getElementById('processedImage');
 
-        // Camera access
-        async function startCamera() {
+        // Kamera erişimi
+        async function setupCamera() {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+            video.srcObject = stream;
+        }
+
+        setupCamera();
+
+        // OCR işlemi
+        async function performOCR(imageData) {
+            const worker = await Tesseract.createWorker('eng');
+            const { data: { text } } = await worker.recognize(imageData);
+            await worker.terminate();
+            return text;
+        }
+
+        captureBtn.addEventListener('click', async () => {
+            canvas.width = 100;
+            canvas.height = 70;
+            canvas.getContext('2d').drawImage(video, 0, 0, 100, 70);
+            
+            const imageData = canvas.toDataURL('image/png');
+            result.textContent = 'İşleniyor...';
+            
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-                video.srcObject = stream;
-            } catch (err) {
-                console.error("Camera access error:", err);
-                alert("Could not access camera. Please check camera permissions.");
+                const text = await performOCR(imageData);
+                result.textContent = 'Taranan Metin: ' + text;
+            } catch (error) {
+                result.textContent = 'Hata oluştu: ' + error.message;
             }
-        }
-
-        // Image processing with OpenCV
-        function processImage(src) {
-            let mat = cv.imread(src);
-            let dst = new cv.Mat();
-            
-            // Convert to grayscale
-            cv.cvtColor(mat, mat, cv.COLOR_RGBA2GRAY);
-            
-            // Apply adaptive threshold
-            cv.adaptiveThreshold(mat, dst, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 11, 2);
-            
-            // Apply morphological operations to clean up the image
-            let kernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(3, 3));
-            cv.morphologyEx(dst, dst, cv.MORPH_CLOSE, kernel);
-            
-            cv.imshow('processedImage', dst);
-            mat.delete();
-            dst.delete();
-            kernel.delete();
-            
-            processedImage.style.display = 'block';
-            return processedImage;
-        }
-
-        // Scan and OCR
-        scanButton.onclick = function() {
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            canvas.getContext('2d').drawImage(video, 0, 0);
-            
-            result.textContent = "Processing and scanning...";
-            
-            // Process image with OpenCV
-            let processedImg = processImage(canvas);
-            
-            // Perform OCR on processed image
-            Tesseract.recognize(processedImg, 'eng')
-                .then(({ data: { text } }) => {
-                    result.textContent = text;
-                })
-                .catch(err => {
-                    console.error("OCR error:", err);
-                    result.textContent = "OCR scan failed.";
-                });
-        };
-
-        // Start camera when OpenCV is ready
-        function onOpenCvReady() {
-            startCamera();
-        }
+        });
     </script>
 </body>
 </html>
