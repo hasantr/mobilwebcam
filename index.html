@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Enhanced Debug OCR App</title>
+    <title>Simplified OCR App</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -39,7 +39,7 @@
             border: 2px solid red;
             box-sizing: border-box;
         }
-        #scanButton {
+        button {
             background-color: #4CAF50;
             border: none;
             color: white;
@@ -48,7 +48,7 @@
             text-decoration: none;
             display: inline-block;
             font-size: 16px;
-            margin: 20px 0;
+            margin: 10px 0;
             cursor: pointer;
             border-radius: 5px;
         }
@@ -72,12 +72,13 @@
     </style>
 </head>
 <body>
-    <h1>Enhanced Debug OCR App</h1>
+    <h1>Simplified OCR App</h1>
     <div id="videoContainer">
         <video id="video" autoplay playsinline></video>
         <div id="scanArea"></div>
     </div>
     <button id="scanButton">Scan Digits</button>
+    <button id="testOCRButton">Test OCR</button>
     <canvas id="canvas" style="display: none;"></canvas>
     <div id="result"></div>
     <div id="debugInfo"></div>
@@ -87,11 +88,10 @@
         const video = document.getElementById('video');
         const canvas = document.getElementById('canvas');
         const scanButton = document.getElementById('scanButton');
+        const testOCRButton = document.getElementById('testOCRButton');
         const result = document.getElementById('result');
         const debugInfo = document.getElementById('debugInfo');
         const capturedImage = document.getElementById('capturedImage');
-
-        let worker;
 
         // Camera access
         async function startCamera() {
@@ -108,28 +108,6 @@
                 console.error("Camera access error:", err);
                 debugInfo.textContent += `Camera error: ${err.name} - ${err.message}\n`;
                 alert("Failed to access camera. Please check camera permissions and refresh the page.");
-            }
-        }
-
-        // Initialize Tesseract
-        async function initTesseract() {
-            try {
-                worker = await Tesseract.createWorker({
-                    logger: m => {
-                        console.log(m);
-                        debugInfo.textContent += `Tesseract: ${m.status}\n`;
-                    }
-                });
-                await worker.loadLanguage('eng');
-                await worker.initialize('eng');
-                await worker.setParameters({
-                    tessedit_char_whitelist: '0123456789',
-                    tessedit_pageseg_mode: Tesseract.PSM.SINGLE_LINE,
-                });
-                debugInfo.textContent += "Tesseract initialized successfully\n";
-            } catch (err) {
-                console.error("Tesseract initialization error:", err);
-                debugInfo.textContent += `Tesseract init error: ${err.message}\n`;
             }
         }
 
@@ -154,10 +132,9 @@
             capturedImage.src = canvas.toDataURL('image/png');
 
             try {
-                if (!worker) {
-                    throw new Error("Tesseract worker not initialized");
-                }
-                const { data: { text } } = await worker.recognize(canvas);
+                const { data: { text } } = await Tesseract.recognize(canvas, 'eng', {
+                    logger: m => console.log(m)
+                });
                 const cleanedText = text.replace(/[^0-9]/g, '');
                 result.textContent = cleanedText || "No digits found";
                 debugInfo.textContent += `OCR result: ${text}\nCleaned result: ${cleanedText}\n`;
@@ -168,9 +145,29 @@
             }
         };
 
-        // Start the application
+        // Test OCR with a known image
+        testOCRButton.onclick = async function() {
+            result.textContent = "Testing OCR...";
+            debugInfo.textContent = "Test OCR button clicked\n";
+
+            const testImage = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMgAAAAyCAYAAAAZUZThAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAJTSURBVHhe7d1BbsIwEIVhLkfP0gUrdsjSG3CCnrZsWbAgEu2CIhCKij2ecSb5P8mLhojY88bBIckYAAAAAAAAAAAAAAAAAAAAAAAAYEz3ajtMYbyPof+c4vh+DP34dR7mL9taTPPycgrri3qdw7Dy3jz6z2npxqP3agvrPE+hybnW2Hr1bYyx/8h5LzbrU3eN4/yu17AYt9uH/kWv7jqF4UjFxTWF8VXFm1Kx08re3GsM45defU3d+qZixzWnYhdUw+ZULD+tto/DTo1TkR+qhsmLpGInKnZYzX+zqNjLi6Yi31Qs87UZ9qrRMqRruIqJqkBB5lSjZUjXcBUTVYGCzKlGy5Cu4SomqgIFmVONliFdw1VMVIVWC7I61FWDX2Krp5qGoZWCbJ5Wqrmf4tYR+KGiP9pVAf+ybLEgm6eVau6nuFVASqI/2lUB/7JssSDTWmRyVaOpINPNXSHOqe7Uq9XYTSu8nGAW+COnNf9TXa26k0iM1dOqvz9lHqfndVv9t67MRSxqfpK0pFhdWSdR8+NElPEOcrPQTK2aHy9adSPNEtYnUr4WeeINbRUmv5LrLn5vssVyR0V+qFjm6yFLOw75OsqeYvIiyV3JdZe/N2plkqvDTJdj1jt1lLzcQUSuLEg2udUUx3cVf7E+3KnYs+UZxjEV+3/6Q3ixczdPSzXuSRVu3njGdKL1rsoauV7PPX4DcVNJ/tRZnw9U+MmLkPsKmIIAAAAAAAAAAAAAAAAAAAAAAAAw7AK/4/8/0sXDEgAAAABJRU5ErkJggg==';
+            
+            try {
+                const { data: { text } } = await Tesseract.recognize(testImage, 'eng', {
+                    logger: m => console.log(m)
+                });
+                const cleanedText = text.replace(/[^0-9]/g, '');
+                result.textContent = cleanedText || "No digits found";
+                debugInfo.textContent += `Test OCR result: ${text}\nCleaned result: ${cleanedText}\n`;
+            } catch (err) {
+                console.error("Test OCR error:", err);
+                result.textContent = "Test OCR failed.";
+                debugInfo.textContent += `Test OCR error: ${err.message}\n`;
+            }
+        };
+
+        // Start the camera
         startCamera();
-        initTesseract();
     </script>
 </body>
 </html>
