@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simplified Camera OCR</title>
+    <title>Enhanced Debug OCR App</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -65,10 +65,14 @@
             white-space: pre-wrap;
             word-wrap: break-word;
         }
+        #capturedImage {
+            max-width: 100%;
+            margin-top: 20px;
+        }
     </style>
 </head>
 <body>
-    <h1>Simplified Camera OCR</h1>
+    <h1>Enhanced Debug OCR App</h1>
     <div id="videoContainer">
         <video id="video" autoplay playsinline></video>
         <div id="scanArea"></div>
@@ -77,6 +81,7 @@
     <canvas id="canvas" style="display: none;"></canvas>
     <div id="result"></div>
     <div id="debugInfo"></div>
+    <img id="capturedImage" alt="Captured Image">
     <script src='https://unpkg.com/tesseract.js@v2.1.0/dist/tesseract.min.js'></script>
     <script>
         const video = document.getElementById('video');
@@ -84,6 +89,7 @@
         const scanButton = document.getElementById('scanButton');
         const result = document.getElementById('result');
         const debugInfo = document.getElementById('debugInfo');
+        const capturedImage = document.getElementById('capturedImage');
 
         let worker;
 
@@ -107,25 +113,30 @@
 
         // Initialize Tesseract
         async function initTesseract() {
-            worker = await Tesseract.createWorker({
-                logger: m => {
-                    console.log(m);
-                    debugInfo.textContent += `Tesseract: ${m.status}\n`;
-                }
-            });
-            await worker.loadLanguage('eng');
-            await worker.initialize('eng');
-            await worker.setParameters({
-                tessedit_char_whitelist: '0123456789',
-                tessedit_pageseg_mode: Tesseract.PSM.SINGLE_LINE,
-            });
-            debugInfo.textContent += "Tesseract initialized\n";
+            try {
+                worker = await Tesseract.createWorker({
+                    logger: m => {
+                        console.log(m);
+                        debugInfo.textContent += `Tesseract: ${m.status}\n`;
+                    }
+                });
+                await worker.loadLanguage('eng');
+                await worker.initialize('eng');
+                await worker.setParameters({
+                    tessedit_char_whitelist: '0123456789',
+                    tessedit_pageseg_mode: Tesseract.PSM.SINGLE_LINE,
+                });
+                debugInfo.textContent += "Tesseract initialized successfully\n";
+            } catch (err) {
+                console.error("Tesseract initialization error:", err);
+                debugInfo.textContent += `Tesseract init error: ${err.message}\n`;
+            }
         }
 
         // OCR scanning
         scanButton.onclick = async function() {
             result.textContent = "Scanning...";
-            debugInfo.textContent += "Scan button clicked\n";
+            debugInfo.textContent = "Scan button clicked\n";
             
             // Capture the center area of the camera image
             canvas.width = 200;
@@ -135,13 +146,20 @@
             const startX = (videoWidth - 200) / 2;
             const startY = (videoHeight - 150) / 2;
             
-            canvas.getContext('2d').drawImage(video, startX, startY, 200, 150, 0, 0, 200, 150);
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, startX, startY, 200, 150, 0, 0, 200, 150);
             debugInfo.textContent += `Captured area: ${startX},${startY} - 200x150\n`;
 
+            // Display captured image
+            capturedImage.src = canvas.toDataURL('image/png');
+
             try {
+                if (!worker) {
+                    throw new Error("Tesseract worker not initialized");
+                }
                 const { data: { text } } = await worker.recognize(canvas);
                 const cleanedText = text.replace(/[^0-9]/g, '');
-                result.textContent = cleanedText;
+                result.textContent = cleanedText || "No digits found";
                 debugInfo.textContent += `OCR result: ${text}\nCleaned result: ${cleanedText}\n`;
             } catch (err) {
                 console.error("OCR error:", err);
