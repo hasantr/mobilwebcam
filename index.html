@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simplified OCR App</title>
+    <title>Wide Area OCR App</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -19,8 +19,8 @@
         }
         #videoContainer {
             position: relative;
-            width: 300px;
-            height: 200px;
+            width: 640px;
+            height: 480px;
             overflow: hidden;
             background-color: #000;
         }
@@ -34,8 +34,6 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            width: 200px;
-            height: 150px;
             border: 2px solid red;
             box-sizing: border-box;
         }
@@ -58,7 +56,7 @@
             background-color: white;
             border-radius: 5px;
             width: 100%;
-            max-width: 300px;
+            max-width: 600px;
         }
         #debugInfo {
             background-color: #ffeeee;
@@ -72,7 +70,7 @@
     </style>
 </head>
 <body>
-    <h1>Simplified OCR App</h1>
+    <h1>Wide Area OCR App</h1>
     <div id="videoContainer">
         <video id="video" autoplay playsinline></video>
         <div id="scanArea"></div>
@@ -92,16 +90,25 @@
         const result = document.getElementById('result');
         const debugInfo = document.getElementById('debugInfo');
         const capturedImage = document.getElementById('capturedImage');
+        const scanArea = document.getElementById('scanArea');
+
+        const SCAN_AREA_WIDTH = 480;
+        const SCAN_AREA_HEIGHT = 360;
 
         // Camera access
         async function startCamera() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: "environment" } 
+                    video: { 
+                        facingMode: "environment",
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    } 
                 });
                 video.srcObject = stream;
                 video.onloadedmetadata = () => {
                     video.play();
+                    updateScanArea();
                     debugInfo.textContent += `Video dimensions: ${video.videoWidth}x${video.videoHeight}\n`;
                 };
             } catch (err) {
@@ -111,22 +118,43 @@
             }
         }
 
+        function updateScanArea() {
+            const videoAspectRatio = video.videoWidth / video.videoHeight;
+            const containerAspectRatio = video.offsetWidth / video.offsetHeight;
+
+            let videoDrawWidth, videoDrawHeight;
+
+            if (videoAspectRatio > containerAspectRatio) {
+                videoDrawHeight = video.offsetHeight;
+                videoDrawWidth = video.offsetHeight * videoAspectRatio;
+            } else {
+                videoDrawWidth = video.offsetWidth;
+                videoDrawHeight = video.offsetWidth / videoAspectRatio;
+            }
+
+            const scaleX = videoDrawWidth / video.videoWidth;
+            const scaleY = videoDrawHeight / video.videoHeight;
+
+            scanArea.style.width = `${SCAN_AREA_WIDTH * scaleX}px`;
+            scanArea.style.height = `${SCAN_AREA_HEIGHT * scaleY}px`;
+        }
+
         // OCR scanning
         scanButton.onclick = async function() {
             result.textContent = "Scanning...";
             debugInfo.textContent = "Scan button clicked\n";
             
             // Capture the center area of the camera image
-            canvas.width = 200;
-            canvas.height = 150;
+            canvas.width = SCAN_AREA_WIDTH;
+            canvas.height = SCAN_AREA_HEIGHT;
             const videoWidth = video.videoWidth;
             const videoHeight = video.videoHeight;
-            const startX = (videoWidth - 200) / 2;
-            const startY = (videoHeight - 150) / 2;
+            const startX = (videoWidth - SCAN_AREA_WIDTH) / 2;
+            const startY = (videoHeight - SCAN_AREA_HEIGHT) / 2;
             
             const ctx = canvas.getContext('2d');
-            ctx.drawImage(video, startX, startY, 200, 150, 0, 0, 200, 150);
-            debugInfo.textContent += `Captured area: ${startX},${startY} - 200x150\n`;
+            ctx.drawImage(video, startX, startY, SCAN_AREA_WIDTH, SCAN_AREA_HEIGHT, 0, 0, SCAN_AREA_WIDTH, SCAN_AREA_HEIGHT);
+            debugInfo.textContent += `Captured area: ${startX},${startY} - ${SCAN_AREA_WIDTH}x${SCAN_AREA_HEIGHT}\n`;
 
             // Display captured image
             capturedImage.src = canvas.toDataURL('image/png');
@@ -168,6 +196,9 @@
 
         // Start the camera
         startCamera();
+
+        // Update scan area on window resize
+        window.addEventListener('resize', updateScanArea);
     </script>
 </body>
 </html>
