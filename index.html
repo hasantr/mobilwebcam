@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Wide Area OCR App</title>
+    <title>Advanced Color Processing OCR App</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -63,37 +63,43 @@
             white-space: pre-wrap;
             word-wrap: break-word;
         }
-        #capturedImage {
+        #capturedImage, #processedImage {
             max-width: 100%;
             margin-top: 20px;
         }
     </style>
 </head>
 <body>
-    <h1>Wide Area OCR App</h1>
+    <h1>Advanced Color Processing OCR App</h1>
     <div id="videoContainer">
         <video id="video" autoplay playsinline></video>
         <div id="scanArea"></div>
     </div>
-    <button id="scanButton">Scan Digits</button>
-    <button id="testOCRButton">Test OCR</button>
+    <button id="scanButton">Scan Text</button>
     <canvas id="canvas" style="display: none;"></canvas>
     <div id="result"></div>
     <div id="debugInfo"></div>
     <img id="capturedImage" alt="Captured Image">
+    <img id="processedImage" alt="Processed Image">
     <script src='https://unpkg.com/tesseract.js@v2.1.0/dist/tesseract.min.js'></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/opencv.js/4.5.1/opencv.min.js" onload="onOpenCvReady();" type="text/javascript"></script>
     <script>
         const video = document.getElementById('video');
         const canvas = document.getElementById('canvas');
         const scanButton = document.getElementById('scanButton');
-        const testOCRButton = document.getElementById('testOCRButton');
         const result = document.getElementById('result');
         const debugInfo = document.getElementById('debugInfo');
         const capturedImage = document.getElementById('capturedImage');
+        const processedImage = document.getElementById('processedImage');
         const scanArea = document.getElementById('scanArea');
 
         const SCAN_AREA_WIDTH = 480;
         const SCAN_AREA_HEIGHT = 360;
+
+        function onOpenCvReady() {
+            debugInfo.textContent += "OpenCV.js is ready.\n";
+            startCamera();
+        }
 
         // Camera access
         async function startCamera() {
@@ -139,6 +145,13 @@
             scanArea.style.height = `${SCAN_AREA_HEIGHT * scaleY}px`;
         }
 
+        function preprocessImage(src) {
+            let dst = new cv.Mat();
+            cv.cvtColor(src, src, cv.COLOR_RGBA2GRAY);
+            cv.threshold(src, dst, 0, 255, cv.THRESH_BINARY_INV + cv.THRESH_OTSU);
+            return dst;
+        }
+
         // OCR scanning
         scanButton.onclick = async function() {
             result.textContent = "Scanning...";
@@ -159,43 +172,30 @@
             // Display captured image
             capturedImage.src = canvas.toDataURL('image/png');
 
+            // Preprocess the image
+            let src = cv.imread(canvas);
+            let dst = preprocessImage(src);
+            cv.imshow(canvas, dst);
+            processedImage.src = canvas.toDataURL('image/png');
+
             try {
                 const { data: { text } } = await Tesseract.recognize(canvas, 'eng', {
                     logger: m => console.log(m)
                 });
-                const cleanedText = text.replace(/[^0-9]/g, '');
-                result.textContent = cleanedText || "No digits found";
-                debugInfo.textContent += `OCR result: ${text}\nCleaned result: ${cleanedText}\n`;
+                result.textContent = text || "No text found";
+                debugInfo.textContent += `OCR result: ${text}\n`;
             } catch (err) {
                 console.error("OCR error:", err);
                 result.textContent = "OCR scanning failed.";
                 debugInfo.textContent += `OCR error: ${err.message}\n`;
             }
-        };
 
-        // Test OCR with a known image
-        testOCRButton.onclick = async function() {
-            result.textContent = "Testing OCR...";
-            debugInfo.textContent = "Test OCR button clicked\n";
-
-            const testImage = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMgAAAAyCAYAAAAZUZThAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7DAcdvqGQAAAJTSURBVHhe7d1BbsIwEIVhLkfP0gUrdsjSG3CCnrZsWbAgEu2CIhCKij2ecSb5P8mLhojY88bBIckYAAAAAAAAAAAAAAAAAAAAAAAAYEz3ajtMYbyPof+c4vh+DP34dR7mL9taTPPycgrri3qdw7Dy3jz6z2npxqP3agvrPE+hybnW2Hr1bYyx/8h5LzbrU3eN4/yu17AYt9uH/kWv7jqF4UjFxTWF8VXFm1Kx08re3GsM45defU3d+qZixzWnYhdUw+ZULD+tto/DTo1TkR+qhsmLpGInKnZYzX+zqNjLi6Yi31Qs87UZ9qrRMqRruIqJqkBB5lSjZUjXcBUTVYGCzKlGy5Cu4SomqgIFmVONliFdw1VMVIVWC7I61FWDX2Krp5qGoZWCbJ5Wqrmf4tYR+KGiP9pVAf+ybLEgm6eVau6nuFVASqI/2lUB/7JssSDTWmRyVaOpINPNXSHOqe7Uq9XYTSu8nGAW+COnNf9TXa26k0iM1dOqvz9lHqfndVv9t67MRSxqfpK0pFhdWSdR8+NElPEOcrPQTK2aHy9adSPNEtYnUr4WeeINbRUmv5LrLn5vssVyR0V+qFjm6yFLOw75OsqeYvIiyV3JdZe/N2plkqvDTJdj1jt1lLzcQUSuLEg2udUUx3cVf7E+3KnYs+UZxjEV+3/6Q3ixczdPSzXuSRVu3njGdKL1rsoauV7PPX4DcVNJ/tRZnw9U+MmLkPsKmIIAAAAAAAAAAAAAAAAAAAAAAAAw7AK/4/8/0sXDEgAAAABJRU5ErkJggg==';
-            
-            try {
-                const { data: { text } } = await Tesseract.recognize(testImage, 'eng', {
-                    logger: m => console.log(m)
-                });
-                const cleanedText = text.replace(/[^0-9]/g, '');
-                result.textContent = cleanedText || "No digits found";
-                debugInfo.textContent += `Test OCR result: ${text}\nCleaned result: ${cleanedText}\n`;
-            } catch (err) {
-                console.error("Test OCR error:", err);
-                result.textContent = "Test OCR failed.";
-                debugInfo.textContent += `Test OCR error: ${err.message}\n`;
-            }
+            src.delete();
+            dst.delete();
         };
 
         // Start the camera
-        startCamera();
+        // startCamera();  // This is now called in onOpenCvReady
 
         // Update scan area on window resize
         window.addEventListener('resize', updateScanArea);
