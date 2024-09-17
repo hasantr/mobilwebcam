@@ -48,6 +48,10 @@
         #debug {
             color: red;
         }
+        #preview-canvas {
+            margin-top: 20px;
+            border: 1px solid #ccc;
+        }
     </style>
 </head>
 <body>
@@ -56,12 +60,14 @@
     </div>
     <button id="capture-btn">Tara</button>
     <canvas id="canvas" style="display:none;"></canvas>
+    <canvas id="preview-canvas" width="100" height="70"></canvas>
     <div id="result"></div>
     <div id="debug"></div>
 
     <script>
         const video = document.getElementById('video');
         const canvas = document.getElementById('canvas');
+        const previewCanvas = document.getElementById('preview-canvas');
         const captureBtn = document.getElementById('capture-btn');
         const result = document.getElementById('result');
         const debug = document.getElementById('debug');
@@ -99,16 +105,25 @@
                 canvas.height = 70;
                 canvas.getContext('2d').drawImage(video, 0, 0, 100, 70);
                 
+                // Önizleme canvas'ına görüntüyü çiz
+                previewCanvas.getContext('2d').drawImage(canvas, 0, 0);
+                
                 const imageData = canvas.toDataURL('image/png');
                 result.textContent = 'İşleniyor...';
                 debug.textContent = 'Görüntü yakalandı, OCR başlatılıyor.';
                 
                 const text = await performOCR(imageData);
-                result.textContent = 'Taranan Metin: ' + text;
-                debug.textContent = 'İşlem başarıyla tamamlandı.';
+                if (text && text.trim() !== '') {
+                    result.textContent = 'Taranan Metin: ' + text;
+                    debug.textContent = 'İşlem başarıyla tamamlandı.';
+                } else {
+                    result.textContent = 'Metin bulunamadı.';
+                    debug.textContent = 'OCR işlemi tamamlandı, ancak metin tespit edilemedi.';
+                }
             } catch (error) {
                 result.textContent = 'Hata oluştu';
                 debug.textContent = error.message;
+                console.error('Detaylı hata:', error);
             }
         });
     </script>
