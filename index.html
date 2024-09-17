@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mobil Kamera OCR</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #f0f0f0;
+        }
+        h1 {
+            color: #333;
+        }
+        #video {
+            max-width: 100%;
+            margin-bottom: 20px;
+        }
+        #captureButton, #scanButton {
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 15px 32px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+        #result {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: white;
+            border-radius: 5px;
+            width: 100%;
+            max-width: 300px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Mobil Kamera OCR</h1>
+    <video id="video" autoplay playsinline></video>
+    <button id="captureButton">Görüntü Yakala</button>
+    <button id="scanButton" style="display: none;">OCR Tara</button>
+    <canvas id="canvas" style="display: none;"></canvas>
+    <div id="result"></div>
+
+    <script src='https://unpkg.com/tesseract.js@v2.1.0/dist/tesseract.min.js'></script>
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const captureButton = document.getElementById('captureButton');
+        const scanButton = document.getElementById('scanButton');
+        const result = document.getElementById('result');
+
+        // Kamera erişimi
+        async function startCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+                video.srcObject = stream;
+            } catch (err) {
+                console.error("Kamera erişimi hatası:", err);
+                alert("Kamera erişimi sağlanamadı. Lütfen kamera izinlerini kontrol edin.");
+            }
+        }
+
+        // Görüntü yakalama
+        captureButton.onclick = function() {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
+            scanButton.style.display = 'inline-block';
+        };
+
+        // OCR tarama
+        scanButton.onclick = function() {
+            result.textContent = "Taranıyor...";
+            Tesseract.recognize(canvas, 'tur')
+                .then(({ data: { text } }) => {
+                    result.textContent = text;
+                })
+                .catch(err => {
+                    console.error("OCR hatası:", err);
+                    result.textContent = "OCR taraması başarısız oldu.";
+                });
+        };
+
+        // Kamerayı başlat
+        startCamera();
+    </script>
+</body>
+</html>
