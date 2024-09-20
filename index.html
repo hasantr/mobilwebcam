@@ -15,6 +15,10 @@
             padding: 20px;
             background-color: #f9f9f9;
         }
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+        }
         #video-container {
             position: relative;
             width: 300px;
@@ -34,8 +38,8 @@
             position: absolute;
             top: 50%;
             left: 50%;
-            width: 120px; /* Küçültülmüş başlangıç genişliği */
-            height: 80px; /* Küçültülmüş başlangıç yüksekliği */
+            width: 120px; /* Başlangıç genişliği */
+            height: 80px; /* Başlangıç yüksekliği */
             transform: translate(-50%, -50%);
             border: 2px solid red;
             box-sizing: border-box;
@@ -49,7 +53,14 @@
             width: 100%;
             max-width: 300px;
         }
-        #ocrButton {
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .button-group button {
             padding: 10px 20px;
             font-size: 16px;
             cursor: pointer;
@@ -57,8 +68,10 @@
             color: white;
             border: none;
             border-radius: 5px;
+            flex: 1 1 45%;
+            min-width: 120px;
         }
-        #ocrButton:disabled {
+        .button-group button:disabled {
             background-color: #aaa;
             cursor: not-allowed;
         }
@@ -66,6 +79,7 @@
             margin-top: 20px;
             font-weight: bold;
             width: 100%;
+            text-align: left;
         }
         #result {
             margin-top: 10px;
@@ -75,6 +89,7 @@
             padding: 10px;
             border-radius: 5px;
             min-height: 50px;
+            text-align: left;
         }
         #croppedImage {
             margin-top: 10px;
@@ -97,31 +112,35 @@
                 width: 45vw;
                 height: 30vw;
             }
-            #ocrButton {
-                width: 100%;
+            .button-group button {
+                flex: 1 1 100%;
+                min-width: unset;
             }
         }
-        /* Input Alanları Stili */
-        #inputContainer {
+        /* Slider Alanları Stili */
+        #sliderContainer {
             margin-top: 20px;
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-            justify-content: center;
-        }
-        .inputGroup {
+            width: 100%;
+            max-width: 300px;
             display: flex;
             flex-direction: column;
-            align-items: flex-start;
+            gap: 15px;
         }
-        .inputGroup label {
+        .sliderGroup {
+            display: flex;
+            flex-direction: column;
+        }
+        .sliderGroup label {
             margin-bottom: 5px;
             font-weight: bold;
         }
-        .inputGroup input {
-            width: 80px;
-            padding: 5px;
+        .sliderGroup input[type="range"] {
+            width: 100%;
+        }
+        .sliderValue {
+            text-align: right;
             font-size: 14px;
+            margin-top: 5px;
         }
     </style>
 </head>
@@ -131,33 +150,40 @@
         <video id="video" autoplay playsinline></video>
         <div id="overlay"></div>
     </div>
+    <div id="sliderContainer">
+        <div class="sliderGroup">
+            <label for="widthSlider">Genişlik (px):</label>
+            <input type="range" id="widthSlider" min="50" max="300" value="120">
+            <div class="sliderValue">120px</div>
+        </div>
+        <div class="sliderGroup">
+            <label for="heightSlider">Yükseklik (px):</label>
+            <input type="range" id="heightSlider" min="50" max="300" value="80">
+            <div class="sliderValue">80px</div>
+        </div>
+    </div>
     <div id="controls">
-        <button id="ocrButton" disabled>OCR Oku</button>
+        <div class="button-group">
+            <button id="normalOcrButton" disabled>Normal OCR</button>
+            <button id="invertOcrButton" disabled>Invert OCR</button>
+        </div>
         <div id="resultLabel"><strong>OCR Sonucu:</strong></div>
         <div id="result">Henüz OCR yapılmadı.</div>
         <img id="croppedImage" alt="OCR Alanı">
-    </div>
-    <!-- Yeni Input Alanları -->
-    <div id="inputContainer">
-        <div class="inputGroup">
-            <label for="widthInput">Genişlik (px):</label>
-            <input type="number" id="widthInput" min="50" max="300" value="120">
-        </div>
-        <div class="inputGroup">
-            <label for="heightInput">Yükseklik (px):</label>
-            <input type="number" id="heightInput" min="50" max="300" value="80">
-        </div>
     </div>
 
     <script>
         // Gerekli elementleri seç
         const video = document.getElementById('video');
-        const ocrButton = document.getElementById('ocrButton');
+        const normalOcrButton = document.getElementById('normalOcrButton');
+        const invertOcrButton = document.getElementById('invertOcrButton');
         const resultDiv = document.getElementById('result');
         const croppedImage = document.getElementById('croppedImage');
         const overlay = document.getElementById('overlay');
-        const widthInput = document.getElementById('widthInput');
-        const heightInput = document.getElementById('heightInput');
+        const widthSlider = document.getElementById('widthSlider');
+        const heightSlider = document.getElementById('heightSlider');
+        const widthValue = widthSlider.nextElementSibling;
+        const heightValue = heightSlider.nextElementSibling;
 
         // Kamera başlatma fonksiyonu
         async function startCamera() {
@@ -173,10 +199,11 @@
                 const stream = await navigator.mediaDevices.getUserMedia(constraints);
                 video.srcObject = stream;
 
-                // Video akışı başladığında OCR butonunu etkinleştir
+                // Video akışı başladığında OCR butonlarını etkinleştir
                 video.onloadedmetadata = () => {
                     video.play();
-                    ocrButton.disabled = false;
+                    normalOcrButton.disabled = false;
+                    invertOcrButton.disabled = false;
                 };
             } catch (err) {
                 console.error('Kamera erişim hatası:', err);
@@ -186,45 +213,40 @@
 
         // Overlay boyutunu güncelleme fonksiyonu
         function updateOverlaySize() {
-            const width = parseInt(widthInput.value, 10);
-            const height = parseInt(heightInput.value, 10);
+            const width = parseInt(widthSlider.value, 10);
+            const height = parseInt(heightSlider.value, 10);
 
             // Minimum ve maksimum değerleri kontrol et
-            if (isNaN(width) || width < 50) {
-                widthInput.value = 50;
-            } else if (width > 300) {
-                widthInput.value = 300;
-            }
+            const validWidth = isNaN(width) || width < 50 ? 50 : (width > 300 ? 300 : width);
+            const validHeight = isNaN(height) || height < 50 ? 50 : (height > 300 ? 300 : height);
 
-            if (isNaN(height) || height < 50) {
-                heightInput.value = 50;
-            } else if (height > 300) {
-                heightInput.value = 300;
-            }
+            widthSlider.value = validWidth;
+            heightSlider.value = validHeight;
 
-            // Güncellenmiş değerleri al
-            const updatedWidth = parseInt(widthInput.value, 10);
-            const updatedHeight = parseInt(heightInput.value, 10);
+            // Slider değerlerini göster
+            widthValue.textContent = `${validWidth}px`;
+            heightValue.textContent = `${validHeight}px`;
 
             // Overlay boyutunu güncelle
-            overlay.style.width = `${updatedWidth}px`;
-            overlay.style.height = `${updatedHeight}px`;
+            overlay.style.width = `${validWidth}px`;
+            overlay.style.height = `${validHeight}px`;
 
             // Kırpılmış görüntüyü yeniden boyutlandır
-            croppedImage.style.width = `${updatedWidth}px`;
-            croppedImage.style.height = `${updatedHeight}px`;
+            croppedImage.style.width = `${validWidth}px`;
+            croppedImage.style.height = `${validHeight}px`;
         }
 
-        // Input değişikliklerini dinle
-        widthInput.addEventListener('input', updateOverlaySize);
-        heightInput.addEventListener('input', updateOverlaySize);
+        // Slider değişikliklerini dinle
+        widthSlider.addEventListener('input', updateOverlaySize);
+        heightSlider.addEventListener('input', updateOverlaySize);
 
         // Başlangıçta overlay boyutunu ayarla
         updateOverlaySize();
 
-        // OCR işlemi
-        ocrButton.addEventListener('click', async () => {
-            ocrButton.disabled = true;
+        // OCR işlemi fonksiyonu
+        async function performOCR(invert = false) {
+            normalOcrButton.disabled = true;
+            invertOcrButton.disabled = true;
             resultDiv.textContent = 'OCR işlemi yapılıyor...';
             try {
                 // Video elementinden bir kare al
@@ -243,8 +265,8 @@
                 const scaleX = video.videoWidth / containerRect.width;
                 const scaleY = video.videoHeight / containerRect.height;
 
-                const cropWidth = parseInt(widthInput.value, 10) * scaleX;
-                const cropHeight = parseInt(heightInput.value, 10) * scaleY;
+                const cropWidth = parseInt(widthSlider.value, 10) * scaleX;
+                const cropHeight = parseInt(heightSlider.value, 10) * scaleY;
 
                 const cropX = (rect.left - containerRect.left) * scaleX;
                 const cropY = (rect.top - containerRect.top) * scaleY;
@@ -255,6 +277,19 @@
                 croppedCanvas.height = cropHeight;
                 const croppedCtx = croppedCanvas.getContext('2d');
                 croppedCtx.drawImage(canvas, cropX, cropY, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
+
+                // Renkleri ters çevirme işlemi (invert = true ise)
+                if (invert) {
+                    const imageData = croppedCtx.getImageData(0, 0, croppedCanvas.width, croppedCanvas.height);
+                    const data = imageData.data;
+                    for (let i = 0; i < data.length; i += 4) {
+                        data[i] = 255 - data[i];     // R
+                        data[i + 1] = 255 - data[i + 1]; // G
+                        data[i + 2] = 255 - data[i + 2]; // B
+                        // Alpha (data[i + 3]) değiştirilmez
+                    }
+                    croppedCtx.putImageData(imageData, 0, 0);
+                }
 
                 // Kırpılmış görüntüyü göster
                 croppedImage.src = croppedCanvas.toDataURL('image/png');
@@ -272,9 +307,14 @@
                 console.error('OCR hatası:', err);
                 resultDiv.textContent = 'OCR Hatası: ' + err.message;
             } finally {
-                ocrButton.disabled = false;
+                normalOcrButton.disabled = false;
+                invertOcrButton.disabled = false;
             }
-        });
+        }
+
+        // Butonlara olay dinleyicileri ekle
+        normalOcrButton.addEventListener('click', () => performOCR(false));
+        invertOcrButton.addEventListener('click', () => performOCR(true));
 
         // Kamerayı başlat
         startCamera();
