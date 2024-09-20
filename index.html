@@ -3,153 +3,163 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mobil OCR Kamera Uygulaması</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.1.1/tesseract.min.js"></script>
+    <title>Kamera OCR Uygulaması</title>
+    <!-- Tesseract.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
             display: flex;
             flex-direction: column;
             align-items: center;
-            margin: 0;
             padding: 20px;
-            height: 100vh;
         }
         #video-container {
             position: relative;
-            width: 100px;
-            height: 70px;
-            overflow: hidden;
-            border: 2px solid #333;
+            width: 300px;
+            height: 300px;
+            background-color: #000;
         }
         #video {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
             width: 100%;
             height: 100%;
             object-fit: cover;
         }
-        #capture-btn {
+        #overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 150px;
+            height: 100px;
+            transform: translate(-50%, -50%);
+            border: 2px solid red;
+            box-sizing: border-box;
+            pointer-events: none;
+        }
+        #controls {
             margin-top: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        #ocrButton {
             padding: 10px 20px;
             font-size: 16px;
-            background-color: #4CAF50;
-            color: white;
-            border: none;
             cursor: pointer;
         }
-        #result, #debug {
+        #result {
             margin-top: 20px;
-            width: 100%;
-            max-width: 300px;
+            width: 300px;
             word-wrap: break-word;
+            background-color: #f0f0f0;
+            padding: 10px;
+            border-radius: 5px;
+            min-height: 50px;
         }
-        #debug {
-            color: red;
-        }
-        #preview-canvas {
-            margin-top: 20px;
+        #croppedImage {
+            margin-top: 10px;
+            width: 150px;
+            height: 100px;
             border: 1px solid #ccc;
+            object-fit: cover;
+        }
+        /* Responsive Design */
+        @media (max-width: 400px) {
+            #video-container, #result {
+                width: 90vw;
+                height: auto;
+            }
+            #overlay {
+                width: 45vw;
+                height: 30vw;
+            }
+            #croppedImage {
+                width: 45vw;
+                height: 30vw;
+            }
         }
     </style>
 </head>
 <body>
+    <h1>Kamera OCR Uygulaması</h1>
     <div id="video-container">
         <video id="video" autoplay playsinline></video>
+        <div id="overlay"></div>
     </div>
-    <button id="capture-btn">Tara</button>
-    <canvas id="canvas" style="display:none;"></canvas>
-    <canvas id="preview-canvas" width="100" height="70"></canvas>
-    <div id="result"></div>
-    <div id="debug"></div>
+    <div id="controls">
+        <button id="ocrButton">OCR Oku</button>
+        <div id="resultLabel"><strong>OCR Sonucu:</strong></div>
+        <div id="result"></div>
+        <img id="croppedImage" alt="OCR Alanı">
+    </div>
 
     <script>
+        // Erişim için gerekli elementleri seç
         const video = document.getElementById('video');
-        const canvas = document.getElementById('canvas');
-        const previewCanvas = document.getElementById('preview-canvas');
-        const captureBtn = document.getElementById('capture-btn');
-        const result = document.getElementById('result');
-        const debug = document.getElementById('debug');
+        const ocrButton = document.getElementById('ocrButton');
+        const resultDiv = document.getElementById('result');
+        const croppedImage = document.getElementById('croppedImage');
 
-        // Kamera erişimi
-        async function setupCamera() {
+        // Kamerayı başlat
+        async function startCamera() {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: {
-                        facingMode: 'environment',
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 }
-                    }
-                });
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
                 video.srcObject = stream;
-                video.onloadedmetadata = () => {
-                    debug.textContent = `Kamera başlatıldı. Çözünürlük: ${video.videoWidth}x${video.videoHeight}`;
-                };
-            } catch (error) {
-                debug.textContent = 'Kamera erişim hatası: ' + error.message;
+            } catch (err) {
+                alert('Kameraya erişilemiyor: ' + err.message);
             }
         }
-
-        setupCamera();
 
         // OCR işlemi
-        async function performOCR(imageData) {
-            try {
-                const worker = await Tesseract.createWorker();
-                await worker.loadLanguage('eng');
-                await worker.initialize('eng');
-                debug.textContent = 'OCR işlemi başlatıldı.';
-                const { data: { text } } = await worker.recognize(imageData);
-                await worker.terminate();
-                debug.textContent = 'OCR işlemi tamamlandı.';
-                return text;
-            } catch (error) {
-                console.error('OCR Hatası:', error);
-                throw new Error('OCR işlemi sırasında hata: ' + (error.message || 'Bilinmeyen hata'));
-            }
-        }
+        ocrButton.addEventListener('click', () => {
+            // Video elementinden bir kare al
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-        captureBtn.addEventListener('click', async () => {
-            try {
-                // Kamera görüntüsünün en-boy oranını koruyarak 100x70 boyutuna ölçeklendirme
-                const aspectRatio = video.videoWidth / video.videoHeight;
-                let captureWidth = 100;
-                let captureHeight = captureWidth / aspectRatio;
-                
-                if (captureHeight > 70) {
-                    captureHeight = 70;
-                    captureWidth = captureHeight * aspectRatio;
-                }
+            // OCR alanının koordinatlarını hesapla
+            const overlay = document.getElementById('overlay');
+            const videoContainer = document.getElementById('video-container');
+            const rect = overlay.getBoundingClientRect();
+            const containerRect = videoContainer.getBoundingClientRect();
 
-                canvas.width = captureWidth;
-                canvas.height = captureHeight;
-                canvas.getContext('2d').drawImage(video, 0, 0, captureWidth, captureHeight);
-                
-                // Önizleme canvas'ına görüntüyü çiz
-                previewCanvas.width = captureWidth;
-                previewCanvas.height = captureHeight;
-                previewCanvas.getContext('2d').drawImage(canvas, 0, 0);
-                
-                const imageData = canvas.toDataURL('image/png');
-                result.textContent = 'İşleniyor...';
-                debug.textContent = 'Görüntü yakalandı, OCR başlatılıyor.';
-                
-                const text = await performOCR(imageData);
-                if (text && text.trim() !== '') {
-                    result.textContent = 'Taranan Metin: ' + text;
-                    debug.textContent = 'İşlem başarıyla tamamlandı.';
-                } else {
-                    result.textContent = 'Metin bulunamadı.';
-                    debug.textContent = 'OCR işlemi tamamlandı, ancak metin tespit edilemedi.';
+            // Oran hesaplama (video boyutu ve görüntü boyutu farklı olabilir)
+            const scaleX = video.videoWidth / containerRect.width;
+            const scaleY = video.videoHeight / containerRect.height;
+
+            const cropX = (rect.left - containerRect.left) * scaleX;
+            const cropY = (rect.top - containerRect.top) * scaleY;
+            const cropWidth = rect.width * scaleX;
+            const cropHeight = rect.height * scaleY;
+
+            // Kırpma işlemi
+            const croppedCanvas = document.createElement('canvas');
+            croppedCanvas.width = cropWidth;
+            croppedCanvas.height = cropHeight;
+            const croppedCtx = croppedCanvas.getContext('2d');
+            croppedCtx.drawImage(canvas, cropX, cropY, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
+
+            // Kırpılmış görüntüyü göster
+            croppedImage.src = croppedCanvas.toDataURL('image/png');
+
+            // OCR işlemi
+            Tesseract.recognize(
+                croppedCanvas,
+                'eng', // Dili burada 'eng' olarak belirttim, gerekirse 'tur' veya diğer dilleri kullanabilirsiniz
+                { 
+                    logger: m => console.log(m) 
                 }
-            } catch (error) {
-                result.textContent = 'Hata oluştu';
-                debug.textContent = error.message;
-                console.error('Detaylı hata:', error);
-            }
+            ).then(({ data: { text } }) => {
+                resultDiv.textContent = text;
+            }).catch(err => {
+                resultDiv.textContent = 'OCR Hatası: ' + err.message;
+            });
         });
+
+        // Kamerayı başlat
+        startCamera();
     </script>
 </body>
 </html>
