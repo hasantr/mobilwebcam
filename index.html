@@ -1,243 +1,292 @@
 <!DOCTYPE html>
-<html>
+<html lang="tr">
 <head>
-    <title>QR Kod Okuyucu</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR Kod Okuyucu Uygulaması</title>
+    <!-- jsQR CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.js"></script>
     <style>
-        /* Minimal stiller */
-        body { font-family: Arial, sans-serif; margin: 0; padding: 0; }
-        #camera-container { position: relative; width: 300px; margin: 0 auto; }
-        video { width: 100%; }
-        canvas { position: absolute; top: 0; left: 0; }
-        #controls { display: flex; justify-content: space-between; margin: 10px 0; }
-        #list { max-height: 200px; overflow-y: auto; border: 1px solid #ccc; padding: 5px; }
-        #list li { padding: 2px 5px; cursor: pointer; }
-        #list li:hover { background-color: #f0f0f0; }
-        #keypad { display: none; position: fixed; top: 20%; left: 50%; transform: translateX(-50%); background: #fff; border: 1px solid #ccc; padding: 10px; }
-        #keypad button { width: 50px; height: 50px; margin: 5px; font-size: 18px; }
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            background-color: #f9f9f9;
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        #video-container {
+            position: relative;
+            width: 300px;
+            height: 300px;
+            background-color: #000;
+            border: 2px solid #ccc;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        #video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            background-color: #000;
+        }
+        #overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 150px; /* Başlangıç boyutu */
+            height: 150px; /* Başlangıç boyutu */
+            transform: translate(-50%, -50%);
+            border: 2px solid red;
+            box-sizing: border-box;
+            pointer-events: none;
+        }
+        #controls {
+            margin-top: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            max-width: 300px;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .button-group button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            flex: 1 1 45%;
+            min-width: 120px;
+        }
+        .button-group button:disabled {
+            background-color: #aaa;
+            cursor: not-allowed;
+        }
+        #resultLabel {
+            margin-top: 20px;
+            font-weight: bold;
+            width: 100%;
+            text-align: left;
+        }
+        #result {
+            margin-top: 10px;
+            width: 100%;
+            word-wrap: break-word;
+            background-color: #f0f0f0;
+            padding: 10px;
+            border-radius: 5px;
+            min-height: 50px;
+            text-align: left;
+        }
+        #croppedImage {
+            margin-top: 10px;
+            width: 150px;
+            height: 150px;
+            border: 1px solid #ccc;
+            object-fit: cover;
+        }
+        /* Responsive Design */
+        @media (max-width: 400px) {
+            #video-container, #result {
+                width: 90vw;
+                height: auto;
+            }
+            #overlay {
+                width: 45vw;
+                height: 45vw;
+            }
+            #croppedImage {
+                width: 45vw;
+                height: 45vw;
+            }
+            .button-group button {
+                flex: 1 1 100%;
+                min-width: unset;
+            }
+        }
+        /* Slider Alanları Stili */
+        #sliderContainer {
+            margin-top: 20px;
+            width: 100%;
+            max-width: 300px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .sliderGroup {
+            display: flex;
+            flex-direction: column;
+        }
+        .sliderGroup label {
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .sliderGroup input[type="range"] {
+            width: 100%;
+        }
+        .sliderValue {
+            text-align: right;
+            font-size: 14px;
+            margin-top: 5px;
+        }
     </style>
 </head>
 <body>
-
-<div id="camera-container">
-    <video id="video" autoplay playsinline></video>
-    <canvas id="overlay"></canvas>
-</div>
-
-<div id="controls">
-    <div>
-        <input type="checkbox" id="continuous" /> <label for="continuous">Sürekli Oku</label>
-        <button id="readQR">QR Oku</button>
+    <h1>QR Kod Okuyucu Uygulaması</h1>
+    <div id="video-container">
+        <video id="video" autoplay playsinline></video>
+        <div id="overlay"></div>
     </div>
-    <div>
-        <label>Genişlik</label>
-        <input type="range" id="widthSlider" min="50" max="600" value="150" />
+    <div id="sliderContainer">
+        <div class="sliderGroup">
+            <label for="sizeSlider">Boyut (px):</label>
+            <input type="range" id="sizeSlider" min="50" max="300" value="150">
+            <div class="sliderValue">150px</div>
+        </div>
     </div>
-    <div>
-        <label>Yükseklik</label>
-        <input type="range" id="heightSlider" min="50" max="600" value="80" />
+    <div id="controls">
+        <div class="button-group">
+            <button id="scanQrButton" disabled>QR Kod Oku</button>
+        </div>
+        <div id="resultLabel"><strong>QR Kod Sonucu:</strong></div>
+        <div id="result">Henüz QR kod okunmadı.</div>
+        <img id="croppedImage" alt="QR Kod Alanı">
     </div>
-</div>
 
-<ul id="list"></ul>
-<div>
-    <button id="add">Ekle</button>
-    <button id="undo">Geri Al</button>
-    <button id="share">Paylaş</button>
-    <button id="clear">Temizle</button>
-</div>
+    <script>
+        // Gerekli elementleri seç
+        const video = document.getElementById('video');
+        const scanQrButton = document.getElementById('scanQrButton');
+        const resultDiv = document.getElementById('result');
+        const croppedImage = document.getElementById('croppedImage');
+        const overlay = document.getElementById('overlay');
+        const sizeSlider = document.getElementById('sizeSlider');
+        const sizeValue = sizeSlider.nextElementSibling;
 
-<div id="keypad">
-    <!-- Tuş takımı -->
-    <div id="keypadDisplay"></div>
-    <div>
-        <button class="keypadBtn">1</button>
-        <button class="keypadBtn">2</button>
-        <button class="keypadBtn">3</button>
-        <button class="keypadBtn">-</button>
-    </div>
-    <div>
-        <button class="keypadBtn">4</button>
-        <button class="keypadBtn">5</button>
-        <button class="keypadBtn">6</button>
-        <button id="keypadBackspace">←</button>
-    </div>
-    <div>
-        <button class="keypadBtn">7</button>
-        <button class="keypadBtn">8</button>
-        <button class="keypadBtn">9</button>
-        <button id="keypadClear">C</button>
-    </div>
-    <div>
-        <button class="keypadBtn">0</button>
-        <button id="keypadEnter">Enter</button>
-    </div>
-</div>
+        // Kamera başlatma fonksiyonu
+        async function startCamera() {
+            try {
+                const constraints = {
+                    video: {
+                        facingMode: "environment",
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    },
+                    audio: false
+                };
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                video.srcObject = stream;
 
-<script>
-    // JavaScript kodu
-    const video = document.getElementById('video');
-    const overlay = document.getElementById('overlay');
-    const canvas = overlay.getContext('2d');
-    const widthSlider = document.getElementById('widthSlider');
-    const heightSlider = document.getElementById('heightSlider');
-    const continuousCheckbox = document.getElementById('continuous');
-    const readQRButton = document.getElementById('readQR');
-    const list = document.getElementById('list');
-    const keypad = document.getElementById('keypad');
-    const keypadDisplay = document.getElementById('keypadDisplay');
-    const keypadButtons = document.querySelectorAll('.keypadBtn');
-    const keypadEnter = document.getElementById('keypadEnter');
-    const keypadBackspace = document.getElementById('keypadBackspace');
-    const keypadClear = document.getElementById('keypadClear');
-    const addButton = document.getElementById('add');
-    const undoButton = document.getElementById('undo');
-    const shareButton = document.getElementById('share');
-    const clearButton = document.getElementById('clear');
-    let redRectWidth = parseInt(widthSlider.value);
-    let redRectHeight = parseInt(heightSlider.value);
-    let scanning = false;
-    let dataList = [];
-
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-        .then(stream => {
-            video.srcObject = stream;
-            video.onloadedmetadata = () => {
-                video.play();
-                overlay.width = video.videoWidth;
-                overlay.height = video.videoHeight;
-                drawRedRectangle();
-            };
-        })
-        .catch(err => {
-            console.error("Kameraya erişim hatası: ", err);
-        });
-
-    function drawRedRectangle() {
-        canvas.clearRect(0, 0, overlay.width, overlay.height);
-        canvas.strokeStyle = 'red';
-        canvas.lineWidth = 2;
-        const x = (overlay.width - redRectWidth) / 2;
-        const y = (overlay.height - redRectHeight) / 2;
-        canvas.strokeRect(x, y, redRectWidth, redRectHeight);
-    }
-
-    widthSlider.addEventListener('input', () => {
-        redRectWidth = parseInt(widthSlider.value);
-        drawRedRectangle();
-    });
-
-    heightSlider.addEventListener('input', () => {
-        redRectHeight = parseInt(heightSlider.value);
-        drawRedRectangle();
-    });
-
-    function scanQRCode() {
-        if (video.readyState === video.HAVE_ENOUGH_DATA) {
-            overlay.width = video.videoWidth;
-            overlay.height = video.videoHeight;
-            canvas.drawImage(video, 0, 0, overlay.width, overlay.height);
-            const x = (overlay.width - redRectWidth) / 2;
-            const y = (overlay.height - redRectHeight) / 2;
-            const imageData = canvas.getImageData(x, y, redRectWidth, redRectHeight);
-            // jsQR ile QR kodu tarama
-            const code = jsQR(imageData.data, imageData.width, imageData.height);
-            if (code) {
-                dataList.push(code.data);
-                updateList();
+                // Video akışı başladığında QR butonunu etkinleştir
+                video.onloadedmetadata = () => {
+                    video.play();
+                    scanQrButton.disabled = false;
+                };
+            } catch (err) {
+                console.error('Kamera erişim hatası:', err);
+                alert('Kameraya erişilemiyor: ' + err.message);
             }
         }
-        if (continuousCheckbox.checked) {
-            requestAnimationFrame(scanQRCode);
-        } else {
-            scanning = false;
+
+        // Overlay boyutunu güncelleme fonksiyonu
+        function updateOverlaySize() {
+            const size = parseInt(sizeSlider.value, 10);
+
+            // Minimum ve maksimum değerleri kontrol et
+            const validSize = isNaN(size) || size < 50 ? 50 : (size > 300 ? 300 : size);
+
+            sizeSlider.value = validSize;
+
+            // Slider değerini göster
+            sizeValue.textContent = `${validSize}px`;
+
+            // Overlay boyutunu güncelle
+            overlay.style.width = `${validSize}px`;
+            overlay.style.height = `${validSize}px`;
+
+            // Kırpılmış görüntüyü yeniden boyutlandır
+            croppedImage.style.width = `${validSize}px`;
+            croppedImage.style.height = `${validSize}px`;
         }
-    }
 
-    readQRButton.addEventListener('click', () => {
-        if (!scanning) {
-            scanning = true;
-            scanQRCode();
+        // Slider değişikliklerini dinle
+        sizeSlider.addEventListener('input', updateOverlaySize);
+
+        // Başlangıçta overlay boyutunu ayarla
+        updateOverlaySize();
+
+        // QR Kod okuma fonksiyonu
+        async function performQRScan() {
+            scanQrButton.disabled = true;
+            resultDiv.textContent = 'QR kod okunuyor...';
+            try {
+                // Video elementinden bir kare al
+                const canvas = document.createElement('canvas');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                // Overlay koordinatlarını hesapla
+                const videoContainer = document.getElementById('video-container');
+                const rect = overlay.getBoundingClientRect();
+                const containerRect = videoContainer.getBoundingClientRect();
+
+                // Ölçek faktörünü hesapla
+                const scaleX = video.videoWidth / containerRect.width;
+                const scaleY = video.videoHeight / containerRect.height;
+
+                const cropSize = parseInt(sizeSlider.value, 10) * scaleX;
+
+                const cropX = (rect.left - containerRect.left) * scaleX;
+                const cropY = (rect.top - containerRect.top) * scaleY;
+
+                // Kırpma işlemi
+                const croppedCanvas = document.createElement('canvas');
+                croppedCanvas.width = cropSize;
+                croppedCanvas.height = cropSize;
+                const croppedCtx = croppedCanvas.getContext('2d');
+                croppedCtx.drawImage(canvas, cropX, cropY, cropSize, cropSize, 0, 0, cropSize, cropSize);
+
+                // Kırpılmış görüntüyü göster
+                croppedImage.src = croppedCanvas.toDataURL('image/png');
+
+                // QR kodu tarama
+                const imageData = croppedCtx.getImageData(0, 0, croppedCanvas.width, croppedCanvas.height);
+                const code = jsQR(imageData.data, imageData.width, imageData.height);
+
+                if (code) {
+                    resultDiv.textContent = code.data;
+                } else {
+                    resultDiv.textContent = 'QR kod bulunamadı.';
+                }
+
+            } catch (err) {
+                console.error('QR kod okuma hatası:', err);
+                resultDiv.textContent = 'QR kod okuma hatası: ' + err.message;
+            } finally {
+                scanQrButton.disabled = false;
+            }
         }
-    });
 
-    continuousCheckbox.addEventListener('change', () => {
-        if (continuousCheckbox.checked) {
-            scanning = true;
-            scanQRCode();
-        } else {
-            scanning = false;
-        }
-    });
+        // Butona olay dinleyicisi ekle
+        scanQrButton.addEventListener('click', performQRScan);
 
-    function updateList() {
-        list.innerHTML = '';
-        dataList.forEach((data, index) => {
-            const li = document.createElement('li');
-            li.textContent = data;
-            li.contentEditable = true;
-            li.addEventListener('input', (e) => {
-                dataList[index] = e.target.textContent;
-            });
-            list.appendChild(li);
-        });
-    }
-
-    addButton.addEventListener('click', () => {
-        keypadDisplay.textContent = '';
-        keypad.style.display = 'block';
-    });
-
-    keypadButtons.forEach(btn => {
-        btn.addEventListener('click', () => {
-            keypadDisplay.textContent += btn.textContent;
-        });
-    });
-
-    keypadEnter.addEventListener('click', () => {
-        if (keypadDisplay.textContent) {
-            dataList.push(keypadDisplay.textContent);
-            updateList();
-        }
-        keypad.style.display = 'none';
-    });
-
-    keypadBackspace.addEventListener('click', () => {
-        keypadDisplay.textContent = keypadDisplay.textContent.slice(0, -1);
-    });
-
-    keypadClear.addEventListener('click', () => {
-        keypadDisplay.textContent = '';
-    });
-
-    undoButton.addEventListener('click', () => {
-        dataList.pop();
-        updateList();
-    });
-
-    clearButton.addEventListener('click', () => {
-        dataList = [];
-        updateList();
-    });
-
-    shareButton.addEventListener('click', () => {
-        const dataStr = dataList.join('\n');
-        if (navigator.share) {
-            navigator.share({ text: dataStr });
-        } else {
-            alert("Paylaşma özelliği desteklenmiyor.");
-        }
-    });
-
-    // Tuş takımını kapatmak için
-    window.addEventListener('click', (e) => {
-        if (e.target == keypad) {
-            keypad.style.display = 'none';
-        }
-    });
-</script>
-
-<!-- jsQR kütüphanesi -->
-<script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.js"></script>
-
+        // Kamerayı başlat
+        startCamera();
+    </script>
 </body>
 </html>
