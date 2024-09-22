@@ -23,8 +23,8 @@
         }
         #video-container {
             position: relative;
-            width: 300px;
-            height: 300px;
+            width: 640px; /* Sabit genişlik */
+            height: 480px; /* Sabit yükseklik */
             background-color: #000;
             border: 2px solid #ccc;
             border-radius: 10px;
@@ -35,14 +35,13 @@
             height: 100%;
             object-fit: cover;
             background-color: #000;
-            /* Transform scaling kaldırıldı */
         }
         #overlay {
             position: absolute;
             top: 50%;
             left: 50%;
-            width: 150px; /* Başlangıç boyutu */
-            height: 150px; /* Başlangıç boyutu */
+            width: 200px; /* Başlangıç boyutu */
+            height: 200px; /* Başlangıç boyutu */
             transform: translate(-50%, -50%);
             border: 2px solid red;
             box-sizing: border-box;
@@ -54,7 +53,7 @@
             flex-direction: column;
             align-items: center;
             width: 100%;
-            max-width: 300px;
+            max-width: 640px;
         }
         .button-group {
             display: flex;
@@ -103,13 +102,13 @@
         }
         #croppedImage {
             margin-top: 10px;
-            width: 150px;
-            height: 150px;
+            width: 200px;
+            height: 200px;
             border: 1px solid #ccc;
             object-fit: cover;
         }
         /* Responsive Design */
-        @media (max-width: 400px) {
+        @media (max-width: 700px) {
             #video-container, #result {
                 width: 90vw;
                 height: auto;
@@ -131,7 +130,7 @@
         #sliderContainer {
             margin-top: 20px;
             width: 100%;
-            max-width: 300px;
+            max-width: 640px;
             display: flex;
             flex-direction: column;
             gap: 15px;
@@ -163,8 +162,8 @@
     <div id="sliderContainer">
         <div class="sliderGroup">
             <label for="sizeSlider">Overlay Boyutu (px):</label>
-            <input type="range" id="sizeSlider" min="50" max="300" value="150">
-            <div class="sliderValue">150px</div>
+            <input type="range" id="sizeSlider" min="100" max="400" value="200">
+            <div class="sliderValue">200px</div>
         </div>
         <!-- Zoom Slider'ı kamera düzeyinde zoom yapacak şekilde güncelledim -->
         <div class="sliderGroup">
@@ -210,8 +209,8 @@
                 const constraints = {
                     video: {
                         facingMode: "environment",
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 }
+                        width: { ideal: 640 },
+                        height: { ideal: 480 }
                     },
                     audio: false
                 };
@@ -252,7 +251,7 @@
             const size = parseInt(sizeSlider.value, 10);
 
             // Minimum ve maksimum değerleri kontrol et
-            const validSize = isNaN(size) || size < 50 ? 50 : (size > 300 ? 300 : size);
+            const validSize = isNaN(size) || size < 100 ? 100 : (size > 400 ? 400 : size);
 
             sizeSlider.value = validSize;
 
@@ -316,8 +315,9 @@
                 const videoWidth = video.videoWidth;
                 const videoHeight = video.videoHeight;
 
-                // Kırpma boyutunu hesapla
-                const cropSize = overlaySize;
+                // Kırpma boyutunu hesapla (zoom etkisini hesaba kat)
+                const zoomFactor = currentZoom;
+                const cropSize = overlaySize / zoomFactor;
 
                 // Video merkez koordinatları
                 const centerX = videoWidth / 2;
@@ -329,10 +329,10 @@
 
                 // Kırpma işlemi
                 const croppedCanvas = document.createElement('canvas');
-                croppedCanvas.width = cropSize;
-                croppedCanvas.height = cropSize;
+                croppedCanvas.width = overlaySize;
+                croppedCanvas.height = overlaySize;
                 const croppedCtx = croppedCanvas.getContext('2d');
-                croppedCtx.drawImage(canvas, cropX, cropY, cropSize, cropSize, 0, 0, cropSize, cropSize);
+                croppedCtx.drawImage(canvas, cropX, cropY, cropSize, cropSize, 0, 0, overlaySize, overlaySize);
 
                 // Kırpılmış görüntüyü göster
                 croppedImage.src = croppedCanvas.toDataURL('image/png');
