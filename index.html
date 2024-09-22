@@ -15,9 +15,11 @@
             padding: 20px;
             background-color: #f9f9f9;
         }
+        /* Başlık boyutunu küçülttüm */
         h1 {
             text-align: center;
             margin-bottom: 20px;
+            font-size: 24px; /* Küçültülmüş font boyutu */
         }
         #video-container {
             position: relative;
@@ -33,6 +35,7 @@
             height: 100%;
             object-fit: cover;
             background-color: #000;
+            transition: transform 0.3s ease; /* Zoom animasyonu için geçiş ekledim */
         }
         #overlay {
             position: absolute;
@@ -75,11 +78,15 @@
             background-color: #aaa;
             cursor: not-allowed;
         }
+        /* Sonuç etiketini ve sonuç alanını düzenledim */
         #resultLabel {
             margin-top: 20px;
             font-weight: bold;
             width: 100%;
             text-align: left;
+            color: black;
+            -webkit-text-stroke: 1px white; /* Beyaz stroke ekledim */
+            text-stroke: 1px white; /* Beyaz stroke ekledim */
         }
         #result {
             margin-top: 10px;
@@ -90,6 +97,9 @@
             border-radius: 5px;
             min-height: 50px;
             text-align: left;
+            color: black; /* Siyah font rengi */
+            -webkit-text-stroke: 0.5px white; /* Beyaz stroke ekledim */
+            text-stroke: 0.5px white; /* Beyaz stroke ekledim */
         }
         #croppedImage {
             margin-top: 10px;
@@ -145,24 +155,33 @@
     </style>
 </head>
 <body>
-    <h1>QR Kod Okuyucu Uygulaması</h1>
+    <h1>QR Kod Okuyucu</h1> <!-- Başlık küçültüldü -->
     <div id="video-container">
         <video id="video" autoplay playsinline></video>
         <div id="overlay"></div>
+        <!-- Sonuç alanını overlay altına taşıdım -->
+        <div id="resultContainer">
+            <div id="resultLabel"><strong>QR Kod Sonucu:</strong></div>
+            <div id="result">Henüz QR kod okunmadı.</div>
+        </div>
     </div>
     <div id="sliderContainer">
         <div class="sliderGroup">
-            <label for="sizeSlider">Boyut (px):</label>
+            <label for="sizeSlider">Overlay Boyutu (px):</label>
             <input type="range" id="sizeSlider" min="50" max="300" value="150">
             <div class="sliderValue">150px</div>
+        </div>
+        <!-- Yeni Zoom Slider Eklendi -->
+        <div class="sliderGroup">
+            <label for="zoomSlider">Zoom:</label>
+            <input type="range" id="zoomSlider" min="1" max="4" step="0.1" value="2">
+            <div class="sliderValue">2x</div>
         </div>
     </div>
     <div id="controls">
         <div class="button-group">
             <button id="scanQrButton" disabled>QR Kod Oku</button>
         </div>
-        <div id="resultLabel"><strong>QR Kod Sonucu:</strong></div>
-        <div id="result">Henüz QR kod okunmadı.</div>
         <img id="croppedImage" alt="QR Kod Alanı">
     </div>
 
@@ -175,6 +194,10 @@
         const overlay = document.getElementById('overlay');
         const sizeSlider = document.getElementById('sizeSlider');
         const sizeValue = sizeSlider.nextElementSibling;
+        const zoomSlider = document.getElementById('zoomSlider');
+        const zoomValue = zoomSlider.nextElementSibling;
+        const videoContainer = document.getElementById('video-container');
+        const resultContainer = document.getElementById('resultContainer');
 
         // Kamera başlatma fonksiyonu
         async function startCamera() {
@@ -222,16 +245,31 @@
             croppedImage.style.height = `${validSize}px`;
         }
 
+        // Zoom seviyesini güncelleme fonksiyonu
+        function updateZoom() {
+            const zoom = parseFloat(zoomSlider.value);
+            zoomSlider.value = zoom;
+
+            // Slider değerini göster
+            zoomValue.textContent = `${zoom}x`;
+
+            // Video elementine zoom uygulama
+            video.style.transform = `scale(${zoom})`;
+        }
+
         // Slider değişikliklerini dinle
         sizeSlider.addEventListener('input', updateOverlaySize);
+        zoomSlider.addEventListener('input', updateZoom);
 
-        // Başlangıçta overlay boyutunu ayarla
+        // Başlangıçta overlay ve zoom boyutunu ayarla
         updateOverlaySize();
+        updateZoom();
 
         // QR Kod okuma fonksiyonu
         async function performQRScan() {
             scanQrButton.disabled = true;
             resultDiv.textContent = 'QR kod okunuyor...';
+            resultContainer.style.backgroundColor = ''; // Arkaplan rengini sıfırla
             try {
                 // Video elementinden bir kare al
                 const canvas = document.createElement('canvas');
@@ -241,7 +279,6 @@
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
                 // Overlay koordinatlarını hesapla
-                const videoContainer = document.getElementById('video-container');
                 const rect = overlay.getBoundingClientRect();
                 const containerRect = videoContainer.getBoundingClientRect();
 
@@ -270,13 +307,19 @@
 
                 if (code) {
                     resultDiv.textContent = code.data;
+                    // Başarılı okuma durumunda arkaplan yeşil
+                    resultContainer.style.backgroundColor = '#d4edda'; // Yeşil arkaplan
                 } else {
                     resultDiv.textContent = 'QR kod bulunamadı.';
+                    // Hatalı okuma durumunda arkaplan kırmızı
+                    resultContainer.style.backgroundColor = '#f8d7da'; // Kırmızı arkaplan
                 }
 
             } catch (err) {
                 console.error('QR kod okuma hatası:', err);
                 resultDiv.textContent = 'QR kod okuma hatası: ' + err.message;
+                // Hata durumunda arkaplan kırmızı
+                resultContainer.style.backgroundColor = '#f8d7da'; // Kırmızı arkaplan
             } finally {
                 scanQrButton.disabled = false;
             }
