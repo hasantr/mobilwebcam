@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Orantılı QR Kod Okuyucu</title>
+    <title>QR Kod Okuyucu Uygulaması</title>
     <!-- jsQR CDN -->
     <script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.js"></script>
     <style>
@@ -18,12 +18,12 @@
         h1 {
             text-align: center;
             margin-bottom: 20px;
-            font-size: 24px; /* Küçültülmüş font boyutu */
+            font-size: 28px;
         }
         #video-container {
             position: relative;
-            width: 640px; /* Sabit genişlik */
-            height: 480px; /* Sabit yükseklik */
+            width: 640px;
+            height: 480px;
             background-color: #000;
             border: 2px solid #ccc;
             border-radius: 10px;
@@ -39,8 +39,8 @@
             position: absolute;
             top: 50%;
             left: 50%;
-            width: 40%; /* Video genişliğinin %40'ı */
-            height: 40%; /* Video yüksekliğinin %40'ı */
+            width: 200px;
+            height: 200px;
             transform: translate(-50%, -50%);
             border: 2px solid red;
             box-sizing: border-box;
@@ -76,15 +76,14 @@
             background-color: #aaa;
             cursor: not-allowed;
         }
-        /* Sonuç etiketini ve sonuç alanını düzenledim */
         #resultLabel {
             margin-top: 20px;
             font-weight: bold;
             width: 100%;
             text-align: left;
             color: black;
-            -webkit-text-stroke: 1px white; /* Beyaz stroke ekledim */
-            text-stroke: 1px white; /* Beyaz stroke ekledim */
+            -webkit-text-stroke: 1px white;
+            text-stroke: 1px white;
         }
         #result {
             margin-top: 10px;
@@ -95,9 +94,9 @@
             border-radius: 5px;
             min-height: 50px;
             text-align: left;
-            color: black; /* Siyah font rengi */
-            -webkit-text-stroke: 0.5px white; /* Beyaz stroke ekledim */
-            text-stroke: 0.5px white; /* Beyaz stroke ekledim */
+            color: black;
+            -webkit-text-stroke: 0.5px white;
+            text-stroke: 0.5px white;
         }
         #croppedImage {
             margin-top: 10px;
@@ -106,26 +105,24 @@
             border: 1px solid #ccc;
             object-fit: cover;
         }
-        /* Responsive Design */
         @media (max-width: 700px) {
             #video-container, #result {
                 width: 90vw;
                 height: auto;
             }
             #overlay {
-                width: 40vw;
-                height: 40vw;
+                width: 45vw;
+                height: 45vw;
             }
             #croppedImage {
-                width: 40vw;
-                height: 40vw;
+                width: 45vw;
+                height: 45vw;
             }
             .button-group button {
                 flex: 1 1 100%;
                 min-width: unset;
             }
         }
-        /* Slider Alanları Stili */
         #sliderContainer {
             margin-top: 20px;
             width: 100%;
@@ -153,16 +150,16 @@
     </style>
 </head>
 <body>
-    <h1>Orantılı QR Kod Okuyucu</h1> <!-- Başlık uygun boyuta ayarlandı -->
+    <h1>QR Kod Okuyucu</h1>
     <div id="video-container">
         <video id="video" autoplay playsinline></video>
         <div id="overlay"></div>
     </div>
     <div id="sliderContainer">
         <div class="sliderGroup">
-            <label for="zoomSlider">Zoom:</label>
-            <input type="range" id="zoomSlider" min="1" max="3" step="0.1" value="1">
-            <div class="sliderValue">1x</div>
+            <label for="sizeSlider">Overlay Boyutu (px):</label>
+            <input type="range" id="sizeSlider" min="100" max="400" value="200">
+            <div class="sliderValue">200px</div>
         </div>
     </div>
     <div id="controls">
@@ -177,24 +174,18 @@
     </div>
 
     <script>
-        // Gerekli elementleri seç
         const video = document.getElementById('video');
         const scanQrButton = document.getElementById('scanQrButton');
         const resultDiv = document.getElementById('result');
         const croppedImage = document.getElementById('croppedImage');
         const overlay = document.getElementById('overlay');
-        const zoomSlider = document.getElementById('zoomSlider');
-        const zoomValue = zoomSlider.nextElementSibling;
+        const sizeSlider = document.getElementById('sizeSlider');
+        const sizeValue = sizeSlider.nextElementSibling;
         const videoContainer = document.getElementById('video-container');
         const resultContainer = document.getElementById('resultContainer');
 
-        // Kamera akışını ve zoom yeteneklerini yönetecek değişkenler
         let videoStream = null;
-        let videoTrack = null;
-        let capabilities = null;
-        let currentZoom = 1;
 
-        // Kamera başlatma fonksiyonu
         async function startCamera() {
             try {
                 const constraints = {
@@ -208,145 +199,99 @@
                 videoStream = await navigator.mediaDevices.getUserMedia(constraints);
                 video.srcObject = videoStream;
 
-                // Video akışı başladığında QR butonunu etkinleştir
                 video.onloadedmetadata = () => {
                     video.play();
                     scanQrButton.disabled = false;
                 };
-
-                // Video track'ini ve yeteneklerini al
-                videoTrack = videoStream.getVideoTracks()[0];
-                capabilities = videoTrack.getCapabilities();
-
-                // Zoom slider'ını yeteneklere göre ayarla
-                if (capabilities.zoom) {
-                    zoomSlider.min = capabilities.zoom.min;
-                    zoomSlider.max = capabilities.zoom.max;
-                    zoomSlider.step = capabilities.zoom.step || 0.1;
-                    zoomSlider.value = currentZoom;
-                    zoomValue.textContent = `${currentZoom.toFixed(1)}x`;
-                    zoomSlider.disabled = false;
-                } else {
-                    // Zoom desteklenmiyorsa slider'ı devre dışı bırak
-                    zoomSlider.disabled = true;
-                    zoomValue.textContent = 'Zoom Desteklenmiyor';
-                }
             } catch (err) {
                 console.error('Kamera erişim hatası:', err);
                 alert('Kameraya erişilemiyor: ' + err.message);
             }
         }
 
-        // Zoom seviyesini güncelleme fonksiyonu (Kamera düzeyinde)
-        async function updateZoom() {
-            if (!videoTrack || !capabilities.zoom) {
-                return;
-            }
-
-            const zoom = parseFloat(zoomSlider.value);
-            zoomValue.textContent = `${zoom.toFixed(1)}x`;
-
-            const constraints = {
-                advanced: [{ zoom: zoom }]
-            };
-
-            try {
-                await videoTrack.applyConstraints(constraints);
-                currentZoom = zoom;
-            } catch (err) {
-                console.error('Zoom uygulama hatası:', err);
-                alert('Zoom uygulanırken bir hata oluştu: ' + err.message);
-            }
+        function updateOverlaySize() {
+            const size = parseInt(sizeSlider.value, 10);
+            const validSize = isNaN(size) || size < 100 ? 100 : (size > 400 ? 400 : size);
+            sizeSlider.value = validSize;
+            sizeValue.textContent = `${validSize}px`;
+            overlay.style.width = `${validSize}px`;
+            overlay.style.height = `${validSize}px`;
+            croppedImage.style.width = `${validSize}px`;
+            croppedImage.style.height = `${validSize}px`;
         }
 
-        // Zoom slider'ı değişikliklerini dinle
-        zoomSlider.addEventListener('input', updateZoom);
+        sizeSlider.addEventListener('input', updateOverlaySize);
+        updateOverlaySize();
 
-        // QR Kod okuma fonksiyonu
         async function performQRScan() {
             scanQrButton.disabled = true;
             resultDiv.textContent = 'QR kod okunuyor...';
-            resultContainer.style.backgroundColor = ''; // Arkaplan rengini sıfırla
+            resultContainer.style.backgroundColor = '';
             try {
-                // Video elementinden bir kare al
                 const canvas = document.createElement('canvas');
                 canvas.width = video.videoWidth;
                 canvas.height = video.videoHeight;
                 const ctx = canvas.getContext('2d');
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-                // Overlay boyutunu al (%40)
-                const overlayWidthPercent = 40; // %40
-                const overlayHeightPercent = 40; // %40
-
-                // Video çözünürlüğü
+                const overlaySize = parseInt(sizeSlider.value, 10);
                 const videoWidth = video.videoWidth;
                 const videoHeight = video.videoHeight;
+                const videoClientWidth = video.clientWidth;
+                const videoClientHeight = video.clientHeight;
 
-                // Overlay boyutunu piksel cinsinden hesapla
-                const overlayWidth = (overlayWidthPercent / 100) * videoWidth;
-                const overlayHeight = (overlayHeightPercent / 100) * videoHeight;
+                const scaleX = videoWidth / videoClientWidth;
+                const scaleY = videoHeight / videoClientHeight;
 
-                // Zoom faktörünü dikkate al
-                const cropWidth = overlayWidth / currentZoom;
-                const cropHeight = overlayHeight / currentZoom;
+                const centerX = videoClientWidth / 2;
+                const centerY = videoClientHeight / 2;
+                const cropSize = overlaySize;
 
-                // Video merkez koordinatları
-                const centerX = videoWidth / 2;
-                const centerY = videoHeight / 2;
+                const cropStartX = centerX - (cropSize / 2);
+                const cropStartY = centerY - (cropSize / 2);
 
-                // Kırpma koordinatlarını hesapla
-                const cropX = centerX - (cropWidth / 2);
-                const cropY = centerY - (cropHeight / 2);
+                const realCropStartX = cropStartX * scaleX;
+                const realCropStartY = cropStartY * scaleY;
+                const realCropSize = cropSize * scaleX;
 
-                // Kırpma işlemi
                 const croppedCanvas = document.createElement('canvas');
-                croppedCanvas.width = overlayWidth;
-                croppedCanvas.height = overlayHeight;
+                croppedCanvas.width = overlaySize;
+                croppedCanvas.height = overlaySize;
                 const croppedCtx = croppedCanvas.getContext('2d');
                 croppedCtx.drawImage(
                     canvas,
-                    cropX,
-                    cropY,
-                    cropWidth,
-                    cropHeight,
+                    realCropStartX,
+                    realCropStartY,
+                    realCropSize,
+                    realCropSize,
                     0,
                     0,
-                    overlayWidth,
-                    overlayHeight
+                    overlaySize,
+                    overlaySize
                 );
 
-                // Kırpılmış görüntüyü göster
                 croppedImage.src = croppedCanvas.toDataURL('image/png');
 
-                // QR kodu tarama
                 const imageData = croppedCtx.getImageData(0, 0, croppedCanvas.width, croppedCanvas.height);
                 const code = jsQR(imageData.data, imageData.width, imageData.height);
 
                 if (code) {
                     resultDiv.textContent = code.data;
-                    // Başarılı okuma durumunda arkaplan yeşil
-                    resultContainer.style.backgroundColor = '#d4edda'; // Yeşil arkaplan
+                    resultContainer.style.backgroundColor = '#d4edda';
                 } else {
                     resultDiv.textContent = 'QR kod bulunamadı.';
-                    // Hatalı okuma durumunda arkaplan kırmızı
-                    resultContainer.style.backgroundColor = '#f8d7da'; // Kırmızı arkaplan
+                    resultContainer.style.backgroundColor = '#f8d7da';
                 }
-
             } catch (err) {
                 console.error('QR kod okuma hatası:', err);
                 resultDiv.textContent = 'QR kod okuma hatası: ' + err.message;
-                // Hata durumunda arkaplan kırmızı
-                resultContainer.style.backgroundColor = '#f8d7da'; // Kırmızı arkaplan
+                resultContainer.style.backgroundColor = '#f8d7da';
             } finally {
                 scanQrButton.disabled = false;
             }
         }
 
-        // Butona olay dinleyicisi ekle
         scanQrButton.addEventListener('click', performQRScan);
-
-        // Kamerayı başlat
         startCamera();
     </script>
 </body>
