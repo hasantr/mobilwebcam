@@ -223,73 +223,75 @@
         sizeSlider.addEventListener('input', updateOverlaySize);
         updateOverlaySize();
 
-        async function performQRScan() {
-            scanQrButton.disabled = true;
-            resultDiv.textContent = 'QR kod okunuyor...';
-            resultContainer.style.backgroundColor = '';
-            try {
-                const canvas = document.createElement('canvas');
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+   async function performQRScan() {
+    scanQrButton.disabled = true;
+    resultDiv.textContent = 'QR kod okunuyor...';
+    resultContainer.style.backgroundColor = '';
+    try {
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-                const overlaySize = parseInt(sizeSlider.value, 10);
-                const videoWidth = video.videoWidth;
-                const videoHeight = video.videoHeight;
-                const videoClientWidth = video.clientWidth;
-                const videoClientHeight = video.clientHeight;
+        const overlaySize = parseInt(sizeSlider.value, 10);
+        const videoWidth = video.videoWidth;
+        const videoHeight = video.videoHeight;
+        const videoClientWidth = video.clientWidth;
+        const videoClientHeight = video.clientHeight;
 
-                const scaleX = videoWidth / videoClientWidth;
-                const scaleY = videoHeight / videoClientHeight;
+        const scaleX = videoWidth / videoClientWidth;
+        const scaleY = videoHeight / videoClientHeight;
 
-                const centerX = videoClientWidth / 2;
-                const centerY = videoClientHeight / 2;
-                const cropSize = overlaySize;
+        const centerX = videoClientWidth / 2;
+        const centerY = videoClientHeight / 2;
+        const cropSize = overlaySize;
 
-                const cropStartX = centerX - (cropSize / 2);
-                const cropStartY = centerY - (cropSize / 2);
+        const cropStartX = centerX - (cropSize / 2);
+        const cropStartY = centerY - (cropSize / 2);
 
-                const realCropStartX = cropStartX * scaleX;
-                const realCropStartY = cropStartY * scaleY;
-                const realCropSize = cropSize * scaleX;
+        const realCropStartX = Math.floor(cropStartX * scaleX);
+        const realCropStartY = Math.floor(cropStartY * scaleY);
+        const realCropSize = Math.floor(cropSize * scaleX);
 
-                const croppedCanvas = document.createElement('canvas');
-                croppedCanvas.width = overlaySize;
-                croppedCanvas.height = overlaySize;
-                const croppedCtx = croppedCanvas.getContext('2d');
-                croppedCtx.drawImage(
-                    canvas,
-                    realCropStartX,
-                    realCropStartY,
-                    realCropSize,
-                    realCropSize,
-                    0,
-                    0,
-                    overlaySize,
-                    overlaySize
-                );
+        const croppedCanvas = document.createElement('canvas');
+        croppedCanvas.width = realCropSize;
+        croppedCanvas.height = realCropSize;
+        const croppedCtx = croppedCanvas.getContext('2d');
+        croppedCtx.drawImage(
+            canvas,
+            realCropStartX,
+            realCropStartY,
+            realCropSize,
+            realCropSize,
+            0,
+            0,
+            realCropSize,
+            realCropSize
+        );
 
-                croppedImage.src = croppedCanvas.toDataURL('image/png');
+        // Yüksek kaliteli veri URL'si oluştur
+        croppedImage.src = croppedCanvas.toDataURL('image/png', 1.0);
 
-                const imageData = croppedCtx.getImageData(0, 0, croppedCanvas.width, croppedCanvas.height);
-                const code = jsQR(imageData.data, imageData.width, imageData.height);
+        // QR kodu tarama için orijinal boyutlu görüntü verilerini kullan
+        const imageData = croppedCtx.getImageData(0, 0, realCropSize, realCropSize);
+        const code = jsQR(imageData.data, imageData.width, imageData.height);
 
-                if (code) {
-                    resultDiv.textContent = code.data;
-                    resultContainer.style.backgroundColor = '#d4edda';
-                } else {
-                    resultDiv.textContent = 'QR kod bulunamadı.';
-                    resultContainer.style.backgroundColor = '#f8d7da';
-                }
-            } catch (err) {
-                console.error('QR kod okuma hatası:', err);
-                resultDiv.textContent = 'QR kod okuma hatası: ' + err.message;
-                resultContainer.style.backgroundColor = '#f8d7da';
-            } finally {
-                scanQrButton.disabled = false;
-            }
+        if (code) {
+            resultDiv.textContent = code.data;
+            resultContainer.style.backgroundColor = '#d4edda';
+        } else {
+            resultDiv.textContent = 'QR kod bulunamadı.';
+            resultContainer.style.backgroundColor = '#f8d7da';
         }
+    } catch (err) {
+        console.error('QR kod okuma hatası:', err);
+        resultDiv.textContent = 'QR kod okuma hatası: ' + err.message;
+        resultContainer.style.backgroundColor = '#f8d7da';
+    } finally {
+        scanQrButton.disabled = false;
+    }
+}
 
         scanQrButton.addEventListener('click', performQRScan);
         startCamera();
