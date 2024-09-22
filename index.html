@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>QR Kod Okuyucu Uygulaması</title>
+    <title>Orantılı QR Kod Okuyucu</title>
     <!-- jsQR CDN -->
     <script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.js"></script>
     <style>
@@ -15,11 +15,10 @@
             padding: 20px;
             background-color: #f9f9f9;
         }
-        /* Başlık boyutunu uygun şekilde ayarladım */
         h1 {
             text-align: center;
             margin-bottom: 20px;
-            font-size: 28px; /* Uygun font boyutu */
+            font-size: 24px; /* Küçültülmüş font boyutu */
         }
         #video-container {
             position: relative;
@@ -40,8 +39,8 @@
             position: absolute;
             top: 50%;
             left: 50%;
-            width: 200px; /* Başlangıç boyutu */
-            height: 200px; /* Başlangıç boyutu */
+            width: 50%; /* Video genişliğinin %50'si */
+            height: 50%; /* Video yüksekliğinin %50'si */
             transform: translate(-50%, -50%);
             border: 2px solid red;
             box-sizing: border-box;
@@ -154,16 +153,16 @@
     </style>
 </head>
 <body>
-    <h1>QR Kod Okuyucu</h1> <!-- Başlık uygun boyuta ayarlandı -->
+    <h1>Orantılı QR Kod Okuyucu</h1> <!-- Başlık uygun boyuta ayarlandı -->
     <div id="video-container">
         <video id="video" autoplay playsinline></video>
         <div id="overlay"></div>
     </div>
     <div id="sliderContainer">
         <div class="sliderGroup">
-            <label for="sizeSlider">Overlay Boyutu (px):</label>
-            <input type="range" id="sizeSlider" min="100" max="400" value="200">
-            <div class="sliderValue">200px</div>
+            <label for="sizeSlider">Overlay Boyutu (%):</label>
+            <input type="range" id="sizeSlider" min="25" max="75" value="50">
+            <div class="sliderValue">50%</div>
         </div>
         <!-- Zoom Slider'ı kamera düzeyinde zoom yapacak şekilde güncelledim -->
         <div class="sliderGroup">
@@ -248,23 +247,26 @@
 
         // Overlay boyutunu güncelleme fonksiyonu
         function updateOverlaySize() {
-            const size = parseInt(sizeSlider.value, 10);
+            const sizePercent = parseInt(sizeSlider.value, 10);
 
             // Minimum ve maksimum değerleri kontrol et
-            const validSize = isNaN(size) || size < 100 ? 100 : (size > 400 ? 400 : size);
+            const validSize = isNaN(sizePercent) || sizePercent < 25 ? 25 : (sizePercent > 75 ? 75 : sizePercent);
 
             sizeSlider.value = validSize;
 
             // Slider değerini göster
-            sizeValue.textContent = `${validSize}px`;
+            sizeValue.textContent = `${validSize}%`;
 
-            // Overlay boyutunu güncelle
-            overlay.style.width = `${validSize}px`;
-            overlay.style.height = `${validSize}px`;
+            // Overlay boyutunu güncelle (video container genişliği ve yüksekliğine göre)
+            const overlayWidth = (validSize / 100) * videoContainer.clientWidth;
+            const overlayHeight = (validSize / 100) * videoContainer.clientHeight;
+
+            overlay.style.width = `${overlayWidth}px`;
+            overlay.style.height = `${overlayHeight}px`;
 
             // Kırpılmış görüntüyü yeniden boyutlandır
-            croppedImage.style.width = `${validSize}px`;
-            croppedImage.style.height = `${validSize}px`;
+            croppedImage.style.width = `${overlayWidth}px`;
+            croppedImage.style.height = `${overlayHeight}px`;
         }
 
         // Zoom seviyesini güncelleme fonksiyonu (Kamera düzeyinde)
@@ -310,42 +312,42 @@
                 const ctx = canvas.getContext('2d');
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-                // Overlay boyutu ve video boyutunu al
-                const overlaySize = parseInt(sizeSlider.value, 10);
+                // Overlay boyutunu ve video boyutunu al
+                const overlaySize = (parseInt(sizeSlider.value, 10) / 100) * videoContainer.clientWidth;
                 const videoWidth = video.videoWidth;
                 const videoHeight = video.videoHeight;
 
                 // Scaling faktörlerini hesapla
-                const scaleX = videoWidth / video.clientWidth;
-                const scaleY = videoHeight / video.clientHeight;
+                const scaleX = videoWidth / videoContainer.clientWidth;
+                const scaleY = videoHeight / videoContainer.clientHeight;
 
                 // Kırpma boyutunu hesapla (zoom etkisini hesaba kat)
-                const zoomFactor = currentZoom;
-                const cropSize = overlaySize / zoomFactor;
+                const cropWidth = overlaySize * scaleX / currentZoom;
+                const cropHeight = overlaySize * scaleY / currentZoom;
 
                 // Video merkez koordinatları
                 const centerX = videoWidth / 2;
                 const centerY = videoHeight / 2;
 
                 // Kırpma koordinatlarını hesapla
-                const cropX = centerX - (cropSize / 2);
-                const cropY = centerY - (cropSize / 2);
+                const cropX = centerX - (cropWidth / 2);
+                const cropY = centerY - (cropHeight / 2);
 
                 // Kırpma işlemi
                 const croppedCanvas = document.createElement('canvas');
-                croppedCanvas.width = overlaySize;
-                croppedCanvas.height = overlaySize;
+                croppedCanvas.width = overlaySize * scaleX / currentZoom;
+                croppedCanvas.height = overlaySize * scaleY / currentZoom;
                 const croppedCtx = croppedCanvas.getContext('2d');
                 croppedCtx.drawImage(
                     canvas,
                     cropX,
                     cropY,
-                    cropSize,
-                    cropSize,
+                    cropWidth,
+                    cropHeight,
                     0,
                     0,
-                    overlaySize,
-                    overlaySize
+                    croppedCanvas.width,
+                    croppedCanvas.height
                 );
 
                 // Kırpılmış görüntüyü göster
