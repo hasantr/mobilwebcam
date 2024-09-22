@@ -315,6 +315,10 @@
                 const videoWidth = video.videoWidth;
                 const videoHeight = video.videoHeight;
 
+                // Scaling faktörlerini hesapla
+                const scaleX = videoWidth / video.clientWidth;
+                const scaleY = videoHeight / video.clientHeight;
+
                 // Kırpma boyutunu hesapla (zoom etkisini hesaba kat)
                 const zoomFactor = currentZoom;
                 const cropSize = overlaySize / zoomFactor;
@@ -332,7 +336,17 @@
                 croppedCanvas.width = overlaySize;
                 croppedCanvas.height = overlaySize;
                 const croppedCtx = croppedCanvas.getContext('2d');
-                croppedCtx.drawImage(canvas, cropX, cropY, cropSize, cropSize, 0, 0, overlaySize, overlaySize);
+                croppedCtx.drawImage(
+                    canvas,
+                    cropX,
+                    cropY,
+                    cropSize,
+                    cropSize,
+                    0,
+                    0,
+                    overlaySize,
+                    overlaySize
+                );
 
                 // Kırpılmış görüntüyü göster
                 croppedImage.src = croppedCanvas.toDataURL('image/png');
