@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kamera OCR Uygulaması</title>
+    <!-- Tesseract.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            background-color: #f9f9f9;
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        #video-container {
+            position: relative;
+            width: 300px;
+            height: 300px;
+            background-color: #000;
+            border: 2px solid #ccc;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        #video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            background-color: #000;
+        }
+        #overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 120px; /* Başlangıç genişliği */
+            height: 80px; /* Başlangıç yüksekliği */
+            transform: translate(-50%, -50%);
+            border: 2px solid red;
+            box-sizing: border-box;
+            pointer-events: none;
+        }
+        #controls {
+            margin-top: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 100%;
+            max-width: 300px;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .button-group button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            flex: 1 1 45%;
+            min-width: 120px;
+        }
+        .button-group button:disabled {
+            background-color: #aaa;
+            cursor: not-allowed;
+        }
+        #resultLabel {
+            margin-top: 20px;
+            font-weight: bold;
+            width: 100%;
+            text-align: left;
+        }
+        #result {
+            margin-top: 10px;
+            width: 100%;
+            word-wrap: break-word;
+            background-color: #f0f0f0;
+            padding: 10px;
+            border-radius: 5px;
+            min-height: 50px;
+            text-align: left;
+        }
+        #croppedImage {
+            margin-top: 10px;
+            width: 120px;
+            height: 80px;
+            border: 1px solid #ccc;
+            object-fit: cover;
+        }
+        /* Responsive Design */
+        @media (max-width: 400px) {
+            #video-container, #result {
+                width: 90vw;
+                height: auto;
+            }
+            #overlay {
+                width: 45vw;
+                height: 30vw;
+            }
+            #croppedImage {
+                width: 45vw;
+                height: 30vw;
+            }
+            .button-group button {
+                flex: 1 1 100%;
+                min-width: unset;
+            }
+        }
+        /* Slider Alanları Stili */
+        #sliderContainer {
+            margin-top: 20px;
+            width: 100%;
+            max-width: 300px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .sliderGroup {
+            display: flex;
+            flex-direction: column;
+        }
+        .sliderGroup label {
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .sliderGroup input[type="range"] {
+            width: 100%;
+        }
+        .sliderValue {
+            text-align: right;
+            font-size: 14px;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Kamera OCR Uygulaması</h1>
+    <div id="video-container">
+        <video id="video" autoplay playsinline></video>
+        <div id="overlay"></div>
+    </div>
+    <div id="sliderContainer">
+        <div class="sliderGroup">
+            <label for="widthSlider">Genişlik (px):</label>
+            <input type="range" id="widthSlider" min="50" max="300" value="120">
+            <div class="sliderValue">120px</div>
+        </div>
+        <div class="sliderGroup">
+            <label for="heightSlider">Yükseklik (px):</label>
+            <input type="range" id="heightSlider" min="50" max="300" value="80">
+            <div class="sliderValue">80px</div>
+        </div>
+    </div>
+    <div id="controls">
+        <div class="button-group">
+            <button id="normalOcrButton" disabled>Normal OCR</button>
+            <button id="invertOcrButton" disabled>Invert OCR</button>
+        </div>
+        <div id="resultLabel"><strong>OCR Sonucu:</strong></div>
+        <div id="result">Henüz OCR yapılmadı.</div>
+        <img id="croppedImage" alt="OCR Alanı">
+    </div>
+
+    <script>
+        // Gerekli elementleri seç
+        const video = document.getElementById('video');
+        const normalOcrButton = document.getElementById('normalOcrButton');
+        const invertOcrButton = document.getElementById('invertOcrButton');
+        const resultDiv = document.getElementById('result');
+        const croppedImage = document.getElementById('croppedImage');
+        const overlay = document.getElementById('overlay');
+        const widthSlider = document.getElementById('widthSlider');
+        const heightSlider = document.getElementById('heightSlider');
+        const widthValue = widthSlider.nextElementSibling;
+        const heightValue = heightSlider.nextElementSibling;
+
+        // Kamera başlatma fonksiyonu
+        async function startCamera() {
+            try {
+                const constraints = {
+                    video: {
+                        facingMode: "environment",
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    },
+                    audio: false
+                };
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                video.srcObject = stream;
+
+                // Video akışı başladığında OCR butonlarını etkinleştir
+                video.onloadedmetadata = () => {
+                    video.play();
+                    normalOcrButton.disabled = false;
+                    invertOcrButton.disabled = false;
+                };
+            } catch (err) {
+                console.error('Kamera erişim hatası:', err);
+                alert('Kameraya erişilemiyor: ' + err.message);
+            }
+        }
+
+        // Overlay boyutunu güncelleme fonksiyonu
+        function updateOverlaySize() {
+            const width = parseInt(widthSlider.value, 10);
+            const height = parseInt(heightSlider.value, 10);
+
+            // Minimum ve maksimum değerleri kontrol et
+            const validWidth = isNaN(width) || width < 50 ? 50 : (width > 300 ? 300 : width);
+            const validHeight = isNaN(height) || height < 50 ? 50 : (height > 300 ? 300 : height);
+
+            widthSlider.value = validWidth;
+            heightSlider.value = validHeight;
+
+            // Slider değerlerini göster
+            widthValue.textContent = `${validWidth}px`;
+            heightValue.textContent = `${validHeight}px`;
+
+            // Overlay boyutunu güncelle
+            overlay.style.width = `${validWidth}px`;
+            overlay.style.height = `${validHeight}px`;
+
+            // Kırpılmış görüntüyü yeniden boyutlandır
+            croppedImage.style.width = `${validWidth}px`;
+            croppedImage.style.height = `${validHeight}px`;
+        }
+
+        // Slider değişikliklerini dinle
+        widthSlider.addEventListener('input', updateOverlaySize);
+        heightSlider.addEventListener('input', updateOverlaySize);
+
+        // Başlangıçta overlay boyutunu ayarla
+        updateOverlaySize();
+
+        // OCR işlemi fonksiyonu
+        async function performOCR(invert = false) {
+            normalOcrButton.disabled = true;
+            invertOcrButton.disabled = true;
+            resultDiv.textContent = 'OCR işlemi yapılıyor...';
+            try {
+                // Video elementinden bir kare al
+                const canvas = document.createElement('canvas');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                // Overlay koordinatlarını hesapla
+                const videoContainer = document.getElementById('video-container');
+                const rect = overlay.getBoundingClientRect();
+                const containerRect = videoContainer.getBoundingClientRect();
+
+                // Ölçek faktörünü hesapla
+                const scaleX = video.videoWidth / containerRect.width;
+                const scaleY = video.videoHeight / containerRect.height;
+
+                const cropWidth = parseInt(widthSlider.value, 10) * scaleX;
+                const cropHeight = parseInt(heightSlider.value, 10) * scaleY;
+
+                const cropX = (rect.left - containerRect.left) * scaleX;
+                const cropY = (rect.top - containerRect.top) * scaleY;
+
+                // Kırpma işlemi
+                const croppedCanvas = document.createElement('canvas');
+                croppedCanvas.width = cropWidth;
+                croppedCanvas.height = cropHeight;
+                const croppedCtx = croppedCanvas.getContext('2d');
+                croppedCtx.drawImage(canvas, cropX, cropY, cropWidth, cropHeight, 0, 0, cropWidth, cropHeight);
+
+                // Renkleri ters çevirme işlemi (invert = true ise)
+                if (invert) {
+                    const imageData = croppedCtx.getImageData(0, 0, croppedCanvas.width, croppedCanvas.height);
+                    const data = imageData.data;
+                    for (let i = 0; i < data.length; i += 4) {
+                        data[i] = 255 - data[i];     // R
+                        data[i + 1] = 255 - data[i + 1]; // G
+                        data[i + 2] = 255 - data[i + 2]; // B
+                        // Alpha (data[i + 3]) değiştirilmez
+                    }
+                    croppedCtx.putImageData(imageData, 0, 0);
+                }
+
+                // Kırpılmış görüntüyü göster
+                croppedImage.src = croppedCanvas.toDataURL('image/png');
+
+                // OCR işlemi
+                const { data: { text } } = await Tesseract.recognize(
+                    croppedCanvas,
+                    'eng', // Gerekirse 'tur' olarak değiştirebilirsiniz
+                    { 
+                        logger: m => console.log(m) 
+                    }
+                );
+                resultDiv.textContent = text || 'Metin bulunamadı.';
+            } catch (err) {
+                console.error('OCR hatası:', err);
+                resultDiv.textContent = 'OCR Hatası: ' + err.message;
+            } finally {
+                normalOcrButton.disabled = false;
+                invertOcrButton.disabled = false;
+            }
+        }
+
+        // Butonlara olay dinleyicileri ekle
+        normalOcrButton.addEventListener('click', () => performOCR(false));
+        invertOcrButton.addEventListener('click', () => performOCR(true));
+
+        // Kamerayı başlat
+        startCamera();
+    </script>
+</body>
+</html>
