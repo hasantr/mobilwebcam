@@ -39,8 +39,8 @@
             position: absolute;
             top: 50%;
             left: 50%;
-            width: 50%; /* Video genişliğinin %50'si */
-            height: 50%; /* Video yüksekliğinin %50'si */
+            width: 40%; /* Video genişliğinin %40'ı */
+            height: 40%; /* Video yüksekliğinin %40'ı */
             transform: translate(-50%, -50%);
             border: 2px solid red;
             box-sizing: border-box;
@@ -113,12 +113,12 @@
                 height: auto;
             }
             #overlay {
-                width: 45vw;
-                height: 45vw;
+                width: 40vw;
+                height: 40vw;
             }
             #croppedImage {
-                width: 45vw;
-                height: 45vw;
+                width: 40vw;
+                height: 40vw;
             }
             .button-group button {
                 flex: 1 1 100%;
@@ -160,12 +160,6 @@
     </div>
     <div id="sliderContainer">
         <div class="sliderGroup">
-            <label for="sizeSlider">Overlay Boyutu (%):</label>
-            <input type="range" id="sizeSlider" min="25" max="75" value="50">
-            <div class="sliderValue">50%</div>
-        </div>
-        <!-- Zoom Slider'ı kamera düzeyinde zoom yapacak şekilde güncelledim -->
-        <div class="sliderGroup">
             <label for="zoomSlider">Zoom:</label>
             <input type="range" id="zoomSlider" min="1" max="3" step="0.1" value="1">
             <div class="sliderValue">1x</div>
@@ -189,8 +183,6 @@
         const resultDiv = document.getElementById('result');
         const croppedImage = document.getElementById('croppedImage');
         const overlay = document.getElementById('overlay');
-        const sizeSlider = document.getElementById('sizeSlider');
-        const sizeValue = sizeSlider.nextElementSibling;
         const zoomSlider = document.getElementById('zoomSlider');
         const zoomValue = zoomSlider.nextElementSibling;
         const videoContainer = document.getElementById('video-container');
@@ -245,30 +237,6 @@
             }
         }
 
-        // Overlay boyutunu güncelleme fonksiyonu
-        function updateOverlaySize() {
-            const sizePercent = parseInt(sizeSlider.value, 10);
-
-            // Minimum ve maksimum değerleri kontrol et
-            const validSize = isNaN(sizePercent) || sizePercent < 25 ? 25 : (sizePercent > 75 ? 75 : sizePercent);
-
-            sizeSlider.value = validSize;
-
-            // Slider değerini göster
-            sizeValue.textContent = `${validSize}%`;
-
-            // Overlay boyutunu güncelle (video container genişliği ve yüksekliğine göre)
-            const overlayWidth = (validSize / 100) * videoContainer.clientWidth;
-            const overlayHeight = (validSize / 100) * videoContainer.clientHeight;
-
-            overlay.style.width = `${overlayWidth}px`;
-            overlay.style.height = `${overlayHeight}px`;
-
-            // Kırpılmış görüntüyü yeniden boyutlandır
-            croppedImage.style.width = `${overlayWidth}px`;
-            croppedImage.style.height = `${overlayHeight}px`;
-        }
-
         // Zoom seviyesini güncelleme fonksiyonu (Kamera düzeyinde)
         async function updateZoom() {
             if (!videoTrack || !capabilities.zoom) {
@@ -291,13 +259,8 @@
             }
         }
 
-        // Slider değişikliklerini dinle
-        sizeSlider.addEventListener('input', updateOverlaySize);
+        // Zoom slider'ı değişikliklerini dinle
         zoomSlider.addEventListener('input', updateZoom);
-
-        // Başlangıçta overlay ve zoom değerini ayarla
-        updateOverlaySize();
-        updateZoom();
 
         // QR Kod okuma fonksiyonu
         async function performQRScan() {
@@ -312,18 +275,21 @@
                 const ctx = canvas.getContext('2d');
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-                // Overlay boyutunu ve video boyutunu al
-                const overlaySize = (parseInt(sizeSlider.value, 10) / 100) * videoContainer.clientWidth;
+                // Overlay boyutunu al (%40)
+                const overlayWidthPercent = 40; // %40
+                const overlayHeightPercent = 40; // %40
+
+                // Video çözünürlüğü
                 const videoWidth = video.videoWidth;
                 const videoHeight = video.videoHeight;
 
-                // Scaling faktörlerini hesapla
-                const scaleX = videoWidth / videoContainer.clientWidth;
-                const scaleY = videoHeight / videoContainer.clientHeight;
+                // Overlay boyutunu piksel cinsinden hesapla
+                const overlayWidth = (overlayWidthPercent / 100) * videoWidth;
+                const overlayHeight = (overlayHeightPercent / 100) * videoHeight;
 
-                // Kırpma boyutunu hesapla (zoom etkisini hesaba kat)
-                const cropWidth = overlaySize * scaleX / currentZoom;
-                const cropHeight = overlaySize * scaleY / currentZoom;
+                // Zoom faktörünü dikkate al
+                const cropWidth = overlayWidth / currentZoom;
+                const cropHeight = overlayHeight / currentZoom;
 
                 // Video merkez koordinatları
                 const centerX = videoWidth / 2;
@@ -335,8 +301,8 @@
 
                 // Kırpma işlemi
                 const croppedCanvas = document.createElement('canvas');
-                croppedCanvas.width = overlaySize * scaleX / currentZoom;
-                croppedCanvas.height = overlaySize * scaleY / currentZoom;
+                croppedCanvas.width = overlayWidth;
+                croppedCanvas.height = overlayHeight;
                 const croppedCtx = croppedCanvas.getContext('2d');
                 croppedCtx.drawImage(
                     canvas,
@@ -346,8 +312,8 @@
                     cropHeight,
                     0,
                     0,
-                    croppedCanvas.width,
-                    croppedCanvas.height
+                    overlayWidth,
+                    overlayHeight
                 );
 
                 // Kırpılmış görüntüyü göster
