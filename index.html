@@ -166,11 +166,11 @@
             <input type="range" id="sizeSlider" min="50" max="300" value="150">
             <div class="sliderValue">150px</div>
         </div>
-        <!-- Zoom Slider'ı uygun şekilde güncelledim -->
+        <!-- Zoom Slider'ı kamera düzeyinde zoom yapacak şekilde güncelledim -->
         <div class="sliderGroup">
             <label for="zoomSlider">Zoom:</label>
-            <input type="range" id="zoomSlider" min="1" max="4" step="0.1" value="2">
-            <div class="sliderValue">2x</div>
+            <input type="range" id="zoomSlider" min="1" max="3" step="0.1" value="1">
+            <div class="sliderValue">1x</div>
         </div>
     </div>
     <div id="controls">
@@ -198,8 +198,11 @@
         const videoContainer = document.getElementById('video-container');
         const resultContainer = document.getElementById('resultContainer');
 
-        // Varsayılan zoom değeri
-        let currentZoom = parseFloat(zoomSlider.value);
+        // Kamera akışını ve zoom yeteneklerini yönetecek değişkenler
+        let videoStream = null;
+        let videoTrack = null;
+        let capabilities = null;
+        let currentZoom = 1;
 
         // Kamera başlatma fonksiyonu
         async function startCamera() {
@@ -212,14 +215,32 @@
                     },
                     audio: false
                 };
-                const stream = await navigator.mediaDevices.getUserMedia(constraints);
-                video.srcObject = stream;
+                videoStream = await navigator.mediaDevices.getUserMedia(constraints);
+                video.srcObject = videoStream;
 
                 // Video akışı başladığında QR butonunu etkinleştir
                 video.onloadedmetadata = () => {
                     video.play();
                     scanQrButton.disabled = false;
                 };
+
+                // Video track'ini ve yeteneklerini al
+                videoTrack = videoStream.getVideoTracks()[0];
+                capabilities = videoTrack.getCapabilities();
+
+                // Zoom slider'ını yeteneklere göre ayarla
+                if (capabilities.zoom) {
+                    zoomSlider.min = capabilities.zoom.min;
+                    zoomSlider.max = capabilities.zoom.max;
+                    zoomSlider.step = capabilities.zoom.step || 0.1;
+                    zoomSlider.value = currentZoom;
+                    zoomValue.textContent = `${currentZoom.toFixed(1)}x`;
+                    zoomSlider.disabled = false;
+                } else {
+                    // Zoom desteklenmiyorsa slider'ı devre dışı bırak
+                    zoomSlider.disabled = true;
+                    zoomValue.textContent = 'Zoom Desteklenmiyor';
+                }
             } catch (err) {
                 console.error('Kamera erişim hatası:', err);
                 alert('Kameraya erişilemiyor: ' + err.message);
@@ -247,13 +268,26 @@
             croppedImage.style.height = `${validSize}px`;
         }
 
-        // Zoom seviyesini güncelleme fonksiyonu
-        function updateZoom() {
-            currentZoom = parseFloat(zoomSlider.value);
-            zoomSlider.value = currentZoom;
+        // Zoom seviyesini güncelleme fonksiyonu (Kamera düzeyinde)
+        async function updateZoom() {
+            if (!videoTrack || !capabilities.zoom) {
+                return;
+            }
 
-            // Slider değerini göster
-            zoomValue.textContent = `${currentZoom}x`;
+            const zoom = parseFloat(zoomSlider.value);
+            zoomValue.textContent = `${zoom.toFixed(1)}x`;
+
+            const constraints = {
+                advanced: [{ zoom: zoom }]
+            };
+
+            try {
+                await videoTrack.applyConstraints(constraints);
+                currentZoom = zoom;
+            } catch (err) {
+                console.error('Zoom uygulama hatası:', err);
+                alert('Zoom uygulanırken bir hata oluştu: ' + err.message);
+            }
         }
 
         // Slider değişikliklerini dinle
@@ -277,16 +311,17 @@
                 const ctx = canvas.getContext('2d');
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-                // Overlay boyutu ve zoom faktörünü al
+                // Overlay boyutu ve video boyutunu al
                 const overlaySize = parseInt(sizeSlider.value, 10);
-                const zoomFactor = currentZoom;
+                const videoWidth = video.videoWidth;
+                const videoHeight = video.videoHeight;
 
-                // Kırpma boyutunu hesapla (zoom faktörüne göre)
-                const cropSize = overlaySize / zoomFactor;
+                // Kırpma boyutunu hesapla
+                const cropSize = overlaySize;
 
                 // Video merkez koordinatları
-                const centerX = video.videoWidth / 2;
-                const centerY = video.videoHeight / 2;
+                const centerX = videoWidth / 2;
+                const centerY = videoHeight / 2;
 
                 // Kırpma koordinatlarını hesapla
                 const cropX = centerX - (cropSize / 2);
